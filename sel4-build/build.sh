@@ -12,7 +12,7 @@ then
 else
 	(cd kernel && git fetch origin)
 fi
-(cd kernel && git checkout e26007550636842893605074b9fa2ba896bd93b3 && rm -rf -- * && git checkout .)
+(cd kernel && git checkout ef99634247b859ae8aafb1e12f052780363a7dbd && rm -rf -- * && git checkout .)
 
 if [ ! -e tools/common ]
 then

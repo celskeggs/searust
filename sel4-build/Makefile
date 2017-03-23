@@ -15,5 +15,18 @@
 
 all: common kernel_elf
 
+PHONY += libsel4
+
 include .config
 include tools/common/project.mk
+
+LIBSEL4_ROOT_PATH=$(KERNEL_ROOT_PATH)/libsel4
+
+libsel4: setup
+	@echo "[LIBSEL4]"
+	$(Q)$(MAKE) $(MAKE_SILENT) -C $(LIBSEL4_ROOT_PATH) -f $(LIBSEL4_ROOT_PATH)/Makefile \
+		SOURCE_DIR=$(LIBSEL4_ROOT_PATH) O=$(KBUILD_ROOT) V=$(V) \
+		TOOLPREFIX=$(CONFIG_CROSS_COMPILER_PREFIX:"%"=%) \
+		HAVE_AUTOCONF=1 NO_PRESERVE_TIMESTAMPS=1 CFLAGS="$(CFLAGS)" \
+		AUTOCONF_DIR=${PWD}/include/generated
+	@echo "[LIBSEL4] done."
