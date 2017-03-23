@@ -22,6 +22,7 @@ include tools/common/project.mk
 
 LIBSEL4_ROOT_PATH=$(KERNEL_ROOT_PATH)/libsel4
 
+# includes installation into sysroot
 libsel4: setup
 	@echo "[LIBSEL4]"
 	$(Q)$(MAKE) $(MAKE_SILENT) -C $(LIBSEL4_ROOT_PATH) -f $(LIBSEL4_ROOT_PATH)/Makefile \
@@ -30,3 +31,6 @@ libsel4: setup
 		HAVE_AUTOCONF=1 NO_PRESERVE_TIMESTAMPS=1 CFLAGS="$(CFLAGS)" \
 		AUTOCONF_DIR=${PWD}/include/generated
 	@echo "[LIBSEL4] done."
+
+install: common kernel_elf libsel4
+	install -D -m 644 stage/x86/pc99/kernel.elf $(SYSROOT)/boot/sel4-dev

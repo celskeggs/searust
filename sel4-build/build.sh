@@ -12,7 +12,7 @@ then
 else
 	(cd kernel && git fetch origin)
 fi
-(cd kernel && git checkout ef99634247b859ae8aafb1e12f052780363a7dbd && rm -rf -- * && git checkout .)
+(cd kernel && git checkout 4bb51f2a41192af0fa8ff3e519685758f6b8267d && rm -rf -- * && git checkout .)
 
 if [ ! -e tools/common ]
 then
@@ -32,5 +32,4 @@ fi
 (cd tools/kbuild && git checkout 820f7efb4fbceeb1d0223f48f34dacfe8378cfdb)
 
 rm -rf build images stage include
-SEL4_ARCH=x86_64 ARCH=x86 PLAT=pc99 make -j4
-install -D -m 644 stage/x86/pc99/kernel.elf $SYSROOT/boot/sel4-dev
+SEL4_ARCH=x86_64 ARCH=x86 PLAT=pc99 make install -j4
