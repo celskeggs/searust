@@ -1,5 +1,11 @@
 #!/bin/bash -e
 
+if [ "$SYSROOT" = '' ]
+then
+	echo "Sysroot not specified!" 1>&2
+	exit 1
+fi
+
 if [ ! -e kernel ]
 then
 	git clone https://github.com/celskeggs/seL4.git kernel
@@ -25,4 +31,6 @@ else
 fi
 (cd tools/kbuild && git checkout 820f7efb4fbceeb1d0223f48f34dacfe8378cfdb)
 
-SEL4_ARCH=x86_64 ARCH=x86 PLAT=pc99 make V=2 clean
+rm -rf build images stage include
+SEL4_ARCH=x86_64 ARCH=x86 PLAT=pc99 make -j4
+install -D -m 644 stage/x86/pc99/kernel.elf $SYSROOT/boot/sel4-dev

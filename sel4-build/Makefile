@@ -15,5 +15,5 @@
 
 all: common kernel_elf
 
--include .config
+include .config
 include tools/common/project.mk
