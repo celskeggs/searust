@@ -32,7 +32,7 @@ libsel4: setup
 		AUTOCONF_DIR=${PWD}/include/generated
 	@echo "[LIBSEL4] done."
 
-images/kernel.elf: stage/x86/pc99/kernel.elf
+images/kernel.elf: kernel_elf
 	objcopy -O elf32-i386 $< $@
 
 install: common images/kernel.elf libsel4
