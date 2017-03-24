@@ -32,5 +32,8 @@ libsel4: setup
 		AUTOCONF_DIR=${PWD}/include/generated
 	@echo "[LIBSEL4] done."
 
-install: common kernel_elf libsel4
-	install -D -m 644 stage/x86/pc99/kernel.elf $(SYSROOT)/boot/sel4-dev
+images/kernel.elf: stage/x86/pc99/kernel.elf
+	objcopy -O elf32-i386 $< $@
+
+install: common images/kernel.elf libsel4
+	install -D -m 644 images/kernel.elf $(SYSROOT)/boot/sel4-dev
