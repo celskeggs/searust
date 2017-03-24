@@ -12,7 +12,7 @@ fn main() {
     .ignore_functions()
     .ignore_methods()
     .clang_arg(format!("-I{}/usr/include/", sysroot))
-    .ctypes_prefix("::coretypes")
+    .ctypes_prefix("::sel4::coretypes")
     .hide_type("seL4_CapRights")
     .hide_type("seL4_CapRights_t")
     .hide_type("seL4_PageFaultIpcRegisters")
