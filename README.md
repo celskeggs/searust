@@ -15,6 +15,11 @@ Run the kernel and core build:
 
 (This will install the kernel and libraries to the sysroot)
 
+Set up rust:
+
+    $ cd corerust
+    $ rustup override add nightly
+
 Run the userspace build:
 
     $ cd corerust
