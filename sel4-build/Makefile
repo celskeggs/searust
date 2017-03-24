@@ -33,7 +33,7 @@ libsel4: setup
 	@echo "[LIBSEL4] done."
 
 images/kernel.elf: kernel_elf
-	objcopy -O elf32-i386 $< $@
+	objcopy -O elf32-i386 stage/x86/pc99/kernel.elf $@
 
 install: common images/kernel.elf libsel4
 	install -D -m 644 images/kernel.elf $(SYSROOT)/boot/sel4-dev
