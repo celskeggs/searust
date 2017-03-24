@@ -55,14 +55,13 @@ unsafe fn x64_sys_send_recv(syscall: i64, dest: u64, info: u64, mr0: u64, mr1: u
 		: "%rcx", "%rbx", "r11", "memory" 
 		: "volatile"
 	);
-	return [dest_out, info_out, mr0_out, mr1_out, mr2_out, mr3_out];
+	[dest_out, info_out, mr0_out, mr1_out, mr2_out, mr3_out]
 }
 
 fn sel4_debug_put_char(c : u8) {
 	unsafe {
 		x64_sys_send_recv(libsel4::seL4_Syscall_ID_seL4_SysDebugPutChar, c as u64, 0, 0, 0, 0, 0);
 	}
-	return;
 }
 
 fn sel4_debug_put_str(s : &str) {
