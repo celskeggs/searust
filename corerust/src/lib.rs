@@ -4,12 +4,22 @@
 
 pub mod sel4;
 
-fn sel4_debug_put_str(s : &str) {
-	for c in s.bytes() {
-		sel4::sel4_debug_put_char(c);
+use core::fmt::Write;
+
+struct DebugOutput {
+}
+
+impl core::fmt::Write for DebugOutput {
+	fn write_str(&mut self, s: &str) -> core::fmt::Result {
+		for c in s.bytes() {
+			sel4::sel4_debug_put_char(c);
+		}
+		Ok(())
 	}
 }
 
 pub fn main() {
-	sel4_debug_put_str("Hello, World!\n");
+	let mut writer = DebugOutput {};
+	writeln!(writer, "ABC");
+	writeln!(writer, "a number: {} and {}", 42, 1.0 / 3.0);
 }

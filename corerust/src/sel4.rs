@@ -33,7 +33,6 @@ unsafe fn x64_sys_send_recv(syscall: i64, dest: u64, info: u64, mr0: u64, mr1: u
 	let mr2_out;
 	let mr3_out;
 	asm!(
-	/*	"movq %rsp, %rcx\nleaq 1f, %rdx\n1: syscall\n" */
 		"movq %rsp, %rbx\nsyscall\nmovq %rbx, %rsp\n"
 		: "={rsi}"(info_out),
 		"={r10}"(mr0_out),
@@ -48,7 +47,7 @@ unsafe fn x64_sys_send_recv(syscall: i64, dest: u64, info: u64, mr0: u64, mr1: u
 		"{r8}"(mr1),
 		"{r9}"(mr2),
 		"{r15}"(mr3)
-		: "%rcx", "%rbx", "r11", "memory" 
+		: "rcx", "rbx", "r11", "memory"
 		: "volatile"
 	);
 	[dest_out, info_out, mr0_out, mr1_out, mr2_out, mr3_out]

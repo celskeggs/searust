@@ -7,7 +7,7 @@ build/_start.s: src/_start.S
 build/_start.o: build/_start.s
 	$(AS) --64 build/_start.s -o build/_start.o
 
-target/x86_64-unknown-linux-gnu/debug/libsearust_core.a: src/lib.rs src/build.rs
+target/x86_64-unknown-linux-gnu/debug/libsearust_core.a: src/lib.rs src/build.rs src/sel4.rs
 	cargo build --target=x86_64-unknown-linux-gnu
 
 build/init.elf: build/_start.o target/x86_64-unknown-linux-gnu/debug/libsearust_core.a
