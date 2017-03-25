@@ -1,11 +1,11 @@
 all: build/init.elf
 
-build/_start.s: src/_start.S
-	mkdir -p build
-	$(CPP) -nostdinc -D HAVE_SEL4_CONFIG -I $(SYSROOT)/usr/include/ src/_start.S >build/_start.s
+# build/_start.s: src/_start.S
+#	mkdir -p build
+#	$(CPP) -nostdinc -D HAVE_SEL4_CONFIG -I $(SYSROOT)/usr/include/ src/_start.S >build/_start.s
 
-build/_start.o: build/_start.s
-	$(AS) --64 build/_start.s -o build/_start.o
+build/_start.o: src/_start.s
+	$(AS) --64 src/_start.s -o build/_start.o
 
 target/x86_64-unknown-linux-gnu/debug/libsearust_core.a: src/lib.rs src/build.rs src/sel4.rs
 	cargo build --target=x86_64-unknown-linux-gnu
@@ -16,7 +16,7 @@ build/init.elf: build/_start.o target/x86_64-unknown-linux-gnu/debug/libsearust_
 .PHONY: clean install
 
 clean:
-	rm -f build/init.elf build/_start.o build/_start.s
+	rm -f build/init.elf build/_start.o
 	cargo clean
 
 install: build/init.elf
