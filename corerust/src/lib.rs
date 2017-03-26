@@ -1,8 +1,12 @@
 #![feature(lang_items)]
 #![feature(asm)]
+#![feature(const_fn)]
+#![feature(drop_types_in_const)]
 #![no_std]
 
 pub mod sel4;
+mod device;
+mod memory;
 
 use core::fmt::Write;
 
@@ -18,19 +22,13 @@ pub fn print_bootinfo(writer: &mut Write) -> core::fmt::Result {
 	try!(writeln!(writer, "  userImageFrames = {}", bi.userImageFrames));
 	try!(writeln!(writer, "  userImagePaging = {}", bi.userImagePaging));
 	try!(writeln!(writer, "  untyped = {}", bi.untyped));
-	try!(writeln!(writer, "  untypedList = {{"));
-	for i in 0 .. (bi.untyped.end - bi.untyped.start) as usize {
-		let desc = bi.untypedList[i];
-		try!(writeln!(writer, "  [{:2>}] = {{ paddr = {:#X}", i, desc.paddr));
-		try!(writeln!(writer, "           sizeBits = {}", desc.sizeBits));
-		try!(writeln!(writer, "           isDevice = {} }}", desc.isDevice != 0));
-	}
-	try!(writeln!(writer, "  }}"));
+	try!(writeln!(writer, "  untypedList = {{{}}}", bi.untyped.end - bi.untyped.start));
 	try!(writeln!(writer, "  initThreadCNodeSizeBits = {}", bi.initThreadCNodeSizeBits));
 	writeln!(writer, "  initThreadDomain = {}", bi.initThreadDomain)
 }
 
 pub fn main() {
 	print_bootinfo(sel4::out()).unwrap();
+	device::init();
 }
 

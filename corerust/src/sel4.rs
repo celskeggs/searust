@@ -65,8 +65,7 @@ pub fn sel4_debug_put_char(c : u8) {
 	}
 }
 
-struct DebugOutput {
-}
+struct DebugOutput;
 
 impl ::core::fmt::Write for DebugOutput {
 	fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
@@ -77,7 +76,6 @@ impl ::core::fmt::Write for DebugOutput {
 	}
 }
 
-static mut BOOTINFO: Option<&libsel4::seL4_BootInfo> = None;
 static mut STDOUT: DebugOutput = DebugOutput {};
 
 pub fn out() -> &'static mut ::core::fmt::Write {
@@ -85,6 +83,8 @@ pub fn out() -> &'static mut ::core::fmt::Write {
 		&mut STDOUT
 	}
 }
+
+static mut BOOTINFO: Option<&libsel4::seL4_BootInfo> = None;
 
 pub fn sel4_bootinfo() -> &'static libsel4::seL4_BootInfo {
 	unsafe {
@@ -119,4 +119,3 @@ pub extern fn panic_fmt(fmt: ::core::fmt::Arguments, file: &'static str, line: u
 pub extern "C" fn _Unwind_Resume() -> ! {
     panic!("cannot unwind");
 }
-
