@@ -5,30 +5,22 @@
 #![no_std]
 
 pub mod sel4;
+mod objs;
+mod kobj;
 mod device;
 mod memory;
+mod boot;
+mod caps;
+mod concurrency;
 
-use core::fmt::Write;
-
-pub fn print_bootinfo(writer: &mut Write) -> core::fmt::Result {
-	let bi = sel4::sel4_bootinfo();
-	try!(writeln!(writer, "BootInfo:"));
-	try!(writeln!(writer, "  nodeID = {}", bi.nodeID));
-	try!(writeln!(writer, "  numNodes = {}", bi.numNodes));
-	try!(writeln!(writer, "  numIOPTLevels = {}", bi.numIOPTLevels as i64));
-	try!(writeln!(writer, "  ipcBuffer = <object>"));
-	try!(writeln!(writer, "  empty = {}", bi.empty));
-	try!(writeln!(writer, "  sharedFrames = {}", bi.sharedFrames));
-	try!(writeln!(writer, "  userImageFrames = {}", bi.userImageFrames));
-	try!(writeln!(writer, "  userImagePaging = {}", bi.userImagePaging));
-	try!(writeln!(writer, "  untyped = {}", bi.untyped));
-	try!(writeln!(writer, "  untypedList = {{{}}}", bi.untyped.end - bi.untyped.start));
-	try!(writeln!(writer, "  initThreadCNodeSizeBits = {}", bi.initThreadCNodeSizeBits));
-	writeln!(writer, "  initThreadDomain = {}", bi.initThreadDomain)
-}
+const VGA_BUFFER: usize = 0xb8000;
 
 pub fn main() {
-	print_bootinfo(sel4::out()).unwrap();
-	device::init();
+	match device::get_device_page(VGA_BUFFER) {
+		Ok(page) => {
+			writeln!(sel4::out(), "device page: obtained {:?}!", page);
+		}, Err(err) => {
+			panic!("Error: {:?}", err);
+		}
+	}
 }
-

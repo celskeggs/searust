@@ -17,6 +17,7 @@ fn main() {
     .hide_type("seL4_CapRights_t")
     .hide_type("seL4_PageFaultIpcRegisters")
     .constified_enum("seL4_Syscall_ID")
+    .constified_enum("invocation_label")
     .generate().unwrap()
     .write_to_file(Path::new(&out_dir).join("libsel4.rs"));
 }
