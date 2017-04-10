@@ -20,10 +20,10 @@ mod vga;
 use core::fmt::Write;
 
 pub fn main() {
-	match vga::VGAOutput::default() {
-		Ok(mut screen) => {
-			writeln!(screen, "Hello, world!");
-		},
-		Err(err) => panic!("could not set up default VGA output: {:?}", err)
-	}
+    match vga::VGAOutput::default() {
+        Ok(mut screen) => {
+            writeln!(screen, "Hello, world!");
+        }
+        Err(err) => panic!("could not set up default VGA output: {:?}", err)
+    }
 }

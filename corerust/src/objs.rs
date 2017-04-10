@@ -185,7 +185,8 @@ impl Page4K {
                     vspace::free_vregion(vregion);
                     Err((self, err))
                 }
-            }, Err(err) => {
+            }
+            Err(err) => {
                 Err((self, err))
             }
         }

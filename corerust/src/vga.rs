@@ -128,9 +128,11 @@ impl VGAOutput {
         match char as char {
             '\n' => {
                 self.next_line()
-            }, '\r' => {
+            }
+            '\r' => {
                 self.cur_x = 0;
-            }, _ => {
+            }
+            _ => {
                 self.screen.put_char(self.cur_x, self.cur_y, char);
                 if self.cur_x == VGA_WIDTH - 1 {
                     self.next_line()

@@ -1,4 +1,3 @@
-
 macro_rules! debug {
     ($fmt:expr) => (write!(::sel4::out(), concat!("[debug] ", $fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => (write!(::sel4::out(), concat!("[debug] ", $fmt, "\n"), $($arg)*));

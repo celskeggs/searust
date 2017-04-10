@@ -92,7 +92,7 @@ impl<T> Box<T> {
         match alloc_type(x) {
             Ok(ptr) => {
                 Ok(Box { ptr })
-            },
+            }
             Err(x) => {
                 Err(x)
             }
@@ -103,7 +103,7 @@ impl<T> Box<T> {
         match alloc_type(x) {
             Ok(ptr) => {
                 Box { ptr }
-            },
+            }
             Err(_) => {
                 panic!("could not allocate memory for box");
             }
@@ -293,7 +293,7 @@ impl<T> LinkedList<T> {
         match cons(x, self) {
             Ok(pair) => {
                 Ok(LinkedList::List(pair))
-            },
+            }
             Err((x, nself)) => {
                 Err((nself, x))
             }
@@ -306,7 +306,7 @@ impl<T> LinkedList<T> {
             Ok(pair) => {
                 *self = LinkedList::List(pair);
                 Ok(())
-            },
+            }
             Err((x, removed_self)) => {
                 *self = removed_self;
                 Err(x)
@@ -378,7 +378,7 @@ impl<T> LinkedList<T> {
 
     pub fn get(&self, i: usize) -> Option<&T> {
         let mut cur: &LinkedList<T> = &self;
-        for ii in 0 .. i {
+        for ii in 0..i {
             if let Some(ncur) = cur.tail() {
                 cur = ncur;
             } else {
@@ -390,7 +390,7 @@ impl<T> LinkedList<T> {
 
     pub fn get_mut<'a>(&'a mut self, i: usize) -> Option<&'a mut T> {
         let mut cur: &mut LinkedList<T> = self;
-        for ii in 0 .. i {
+        for ii in 0..i {
             let tmp = cur;
             if let Some(ncur) = tmp.tailmut() {
                 cur = ncur;
@@ -435,7 +435,7 @@ impl<T> LinkedList<T> {
                         return Some(pair.headmut());
                     }
                     pair.tailmut()
-                },
+                }
                 &mut LinkedList::Empty => {
                     break;
                 }
@@ -454,7 +454,7 @@ impl<T> LinkedList<T> {
                         return Some(pair.head());
                     }
                     pair.tail()
-                },
+                }
                 &LinkedList::Empty => {
                     break;
                 }
@@ -474,7 +474,7 @@ impl<T> LinkedList<T> {
                         return Some((i, pair.head()))
                     }
                     pair.tail()
-                },
+                }
                 &LinkedList::Empty => {
                     return None
                 }
@@ -494,7 +494,7 @@ impl<T> LinkedList<T> {
                         return Some(i)
                     }
                     pair.tail()
-                },
+                }
                 &LinkedList::Empty => {
                     return None
                 }
@@ -539,7 +539,7 @@ impl<'a, T> Iterator for LinkedIter<'a, T> {
             Some((head, tail)) => {
                 self.current = tail;
                 Some(head)
-            },
+            }
             None => None
         }
     }

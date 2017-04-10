@@ -60,7 +60,7 @@ impl Subblock {
                 self.us = Some(uset);
                 Ok((Subblock { ut: Some(earlier), us: None, paddr: self.start(), size_bits: self.size_bits - 1 },
                     Subblock { ut: Some(later), us: None, paddr: self.mid(), size_bits: self.size_bits - 1 }))
-            },
+            }
             Err((err, ut, slots)) => {
                 assert!(self.ut.is_none());
                 self.ut = Some(ut);
@@ -173,7 +173,7 @@ impl DeviceBlock {
                             Err((earlier.into_inner(), later.into_inner(), ll2))
                         }
                     }
-                },
+                }
                 Err((ll, earlier)) => {
                     Err((earlier.into_inner(), later, ll))
                 }
@@ -188,7 +188,7 @@ impl DeviceBlock {
                             Err((earlier.into_inner(), later.into_inner(), ll2))
                         }
                     }
-                },
+                }
                 Err((ll, later)) => {
                     Err((earlier, later.into_inner(), ll))
                 }
@@ -209,7 +209,7 @@ impl DeviceBlock {
         match DeviceBlock::device_split_iter(ll, earlier, later, addr) {
             Ok(ncur) => {
                 Ok(Err(ncur))
-            },
+            }
             Err((earlier, later, ll)) => {
                 ll.get(i).unwrap().borrow_mut().deref_mut().unsplit(earlier, later);
                 Err((KError::NotEnoughMemory, ll))
@@ -232,11 +232,11 @@ impl DeviceBlock {
             match DeviceBlock::iter_i(ri, cur, addr) {
                 Ok(Ok((ut, ll2))) => {
                     return (Ok(ut), ll2);
-                },
+                }
                 Ok(Err(iter)) => {
                     cur = iter;
                     ri = 0;
-                },
+                }
                 Err((err, ll2)) => {
                     return (Err(err), ll2);
                 }
@@ -274,7 +274,7 @@ impl DeviceBlock {
                         Err((err, slot))
                     }
                 }
-            },
+            }
             Err(err) => {
                 Err((err, slot))
             }
@@ -364,7 +364,8 @@ pub fn get_mapped_device_page(addr: usize) -> result::Result<MappedPage4K, KErro
     match page.map_into_vspace(true) {
         Ok(mapping) => {
             Ok(mapping)
-        }, Err((page, err)) => {
+        }
+        Err((page, err)) => {
             return_device_page(addr, page);
             Err(err)
         }
