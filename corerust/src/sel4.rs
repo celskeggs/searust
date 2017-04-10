@@ -242,6 +242,21 @@ pub type seL4_BootInfo = libsel4::seL4_BootInfo;
 pub type seL4_SlotRegion = libsel4::seL4_SlotRegion;
 pub type seL4_UntypedDesc = libsel4::seL4_UntypedDesc;
 
+static mut DEFAULT_STACK: [u8; 65536] = [0; 65536];
+
+#[no_mangle]
+#[naked]
+pub unsafe extern fn _start() {
+    asm!("
+.extern __executable_start
+    add $$65536, %rsp
+    movq $$__executable_start, %rsi
+    call rust_main
+_fail:
+    jmp _fail
+" ::"{rsp}" (&DEFAULT_STACK):: "volatile");
+}
+
 #[no_mangle]
 pub extern fn rust_main(bootinfo_addr: usize, executable_start: usize) {
     let bootinfo = unsafe {

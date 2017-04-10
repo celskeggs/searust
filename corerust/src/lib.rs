@@ -1,4 +1,5 @@
 #![feature(lang_items)]
+#![feature(naked_functions)]
 #![feature(asm)]
 #![feature(const_fn)]
 #![feature(drop_types_in_const)]
