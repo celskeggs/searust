@@ -376,6 +376,31 @@ impl<T> LinkedList<T> {
         }
     }
 
+    pub fn get(&self, i: usize) -> Option<&T> {
+        let mut cur: &LinkedList<T> = &self;
+        for ii in 0 .. i {
+            if let Some(ncur) = cur.tail() {
+                cur = ncur;
+            } else {
+                return None;
+            }
+        }
+        cur.head()
+    }
+
+    pub fn get_mut<'a>(&'a mut self, i: usize) -> Option<&'a mut T> {
+        let mut cur: &mut LinkedList<T> = self;
+        for ii in 0 .. i {
+            let tmp = cur;
+            if let Some(ncur) = tmp.tailmut() {
+                cur = ncur;
+            } else {
+                return None;
+            }
+        }
+        cur.headmut()
+    }
+
     pub fn len(&self) -> usize {
         let mut n = 0;
         let mut cur = self;
@@ -437,6 +462,46 @@ impl<T> LinkedList<T> {
             cur = ncur;
         }
         None
+    }
+
+    pub fn find_and_index<P>(&self, predicate: P) -> Option<(usize, &T)> where P: Fn(&T) -> bool {
+        let mut cur: &LinkedList<T> = self;
+        let mut i: usize = 0;
+        loop {
+            let ncur = match cur {
+                &LinkedList::List(ref pair) => {
+                    if predicate(pair.head()) {
+                        return Some((i, pair.head()))
+                    }
+                    pair.tail()
+                },
+                &LinkedList::Empty => {
+                    return None
+                }
+            };
+            cur = ncur;
+            i += 1;
+        }
+    }
+
+    pub fn find_index<P>(&self, predicate: P) -> Option<usize> where P: Fn(&T) -> bool {
+        let mut cur: &LinkedList<T> = self;
+        let mut i: usize = 0;
+        loop {
+            let ncur = match cur {
+                &LinkedList::List(ref pair) => {
+                    if predicate(pair.head()) {
+                        return Some(i)
+                    }
+                    pair.tail()
+                },
+                &LinkedList::Empty => {
+                    return None
+                }
+            };
+            cur = ncur;
+            i += 1;
+        }
     }
 
     /*    pub fn iter_mut<'a>(&'a mut self) -> LinkedIterMut<'a, T> {

@@ -78,7 +78,7 @@ impl CapSlotSet {
     pub fn full(&self) -> bool {
         assert!(self.fillend >= self.fillstart);
         assert!(self.fillstart >= self.start && self.fillend <= self.end);
-        self.fillstart == self.start && self.fillend == self.fillend
+        self.fillstart == self.start && self.fillend == self.end
     }
 
     pub fn assert_full(&mut self) {
@@ -191,7 +191,7 @@ impl CapRange {
 
     pub fn is_empty(&self) -> bool {
         assert!(self.end >= self.start);
-        self.end != self.start
+        self.end == self.start
     }
 
     pub fn is_after(&self, other: &CapRange) -> bool {
@@ -413,6 +413,7 @@ pub fn allocate_cap_slot() -> core::result::Result<CapSlot, KError> {
     if is_now_empty {
         assert!(rl.popmut().unwrap().is_empty());
     }
+    debug!("allocated slot {}", cslot);
     Ok(CapSlot { index: cslot })
 }
 
@@ -431,7 +432,8 @@ pub fn allocate_cap_slots(n: usize) -> core::result::Result<CapSlotSet, KError> 
         assert!(rl.remove_mut(|b| b.is_empty()).unwrap().is_empty());
         assert!(rl.find(|b| b.is_empty()).is_none());
     }
-    Ok(crange.to_set_empty())
+    debug!("allocated slot range {}", crange);
+    Ok(crange.to_set_asserted_full())
 }
 
 fn merge_caprange(mut r: CapRange) {
@@ -475,5 +477,11 @@ pub fn free_cap_slot(cs: CapSlot) {
 }
 
 pub fn free_cap_slots(cs: CapSlotSet) {
+    assert!(cs.capacity() > 0);
     merge_caprange(cs.deconstruct());
+}
+
+pub fn init_cslots(cs: CapRange) {
+    assert!(!cs.is_empty());
+    merge_caprange(cs);
 }

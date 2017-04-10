@@ -39,8 +39,10 @@ impl Untyped {
                   -> result::Result<CapSet, (KError, CapSlotSet)> {
         assert!(capslots.capacity() > 0);
         assert!(capslots.full());
+        assert!(capslots.count() > 0);
+        assert!(capslots.count() == capslots.capacity());
         let err = kobj::sel4_untyped_retype(self.cap.peek_index(), objtype as usize, size_bits as usize,
-                                            ::caps::ROOT_SLOT, ::caps::ROOT_SLOT, ::caps::ROOT_BITS,
+                                            ::caps::ROOT_SLOT, 0, 0,
                                             capslots.start(), capslots.count());
         if err.is_okay() {
             Ok(capslots.assert_derive_capset())

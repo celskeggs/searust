@@ -19,4 +19,5 @@ pub fn print_bootinfo(writer: &mut ::core::fmt::Write, bi: &::sel4::seL4_BootInf
 pub fn set_bootinfo(bi: &::sel4::seL4_BootInfo) {
     print_bootinfo(::sel4::out(), bi).unwrap();
     ::device::init_untyped(::caps::CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untypedList);
+    ::caps::init_cslots(::caps::CapRange::range(bi.empty.start as usize, bi.empty.end as usize));
 }

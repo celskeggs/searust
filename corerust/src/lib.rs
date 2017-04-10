@@ -4,6 +4,8 @@
 #![feature(drop_types_in_const)]
 #![no_std]
 
+#[macro_use]
+mod debug;
 pub mod sel4;
 mod objs;
 mod kobj;

@@ -138,16 +138,20 @@ impl DeviceBlock {
         self.start() <= addr && addr < self.end()
     }
 
-    fn device_scan<'a>(&'a self, addr: usize) -> result::Result<RefMut<'a, Subblock>, KError> {
+    fn device_scan<'a>(&'a self, ll: &'a LinkedList<RefCell<Subblock>>, addr: usize) -> result::Result<usize, KError> {
+        assert!(self.caps.is_empty()); // not currently valid
         assert!(self.contains(addr));
-        if let Some(found) = self.caps.find(|b| b.borrow().contains(addr)) {
+        if let Some((index, found)) = ll.find_and_index(|b| b.borrow().contains(addr)) {
             if found.borrow().is_available() {
-                Ok(found.borrow_mut())
+                Ok(index)
             } else {
+                debug!("failed lookup of {} due to lack of availability", addr);
                 Err(KError::FailedLookup)
             }
         } else {
-            Err(KError::FailedLookup)
+            // should be guaranteed to find it, since everything is just a subblock of the overall
+            // thing, and that containment should already be checked.
+            panic!("could not look up expected address {:#X}", addr);
         }
     }
 
@@ -192,86 +196,56 @@ impl DeviceBlock {
         }
     }
 
-    fn first_v(mut r: RefMut<Subblock>, ll: LinkedList<RefCell<Subblock>>, addr: usize) -> result::Result<result::Result<(Untyped, LinkedList<RefCell<Subblock>>), LinkedList<RefCell<Subblock>>>, (KError, LinkedList<RefCell<Subblock>>)> {
-        match r.deref_mut().try_use_as_page() {
-            Ok(Ok(ut)) => Ok(Ok((ut, ll))),
-            Ok(Err((earlier, later))) => {
-                match DeviceBlock::device_split_iter(ll, earlier, later, addr) {
-                    Ok(ncur) => {
-                        Ok(Err(ncur))
-                    },
-                    Err((earlier, later, ll)) => {
-                        r.deref_mut().unsplit(earlier, later);
-                        return Err((KError::NotEnoughMemory, ll));
-                    }
-                }
-            },
-            Err(err) => {
-                Err((err, ll))
-            }
+    fn iter_i(i: usize, ll: LinkedList<RefCell<Subblock>>, addr: usize) -> result::Result<result::Result<(Untyped, LinkedList<RefCell<Subblock>>), LinkedList<RefCell<Subblock>>>, (KError, LinkedList<RefCell<Subblock>>)> {
+        let page = ll.get(i).unwrap().borrow_mut().deref_mut().try_use_as_page();
+        if let Err(err) = page {
+            return Err((page.err().unwrap(), ll));
         }
-    }
-
-    fn nonfirst_v(ll: LinkedList<RefCell<Subblock>>, addr: usize) -> result::Result<result::Result<(Untyped, LinkedList<RefCell<Subblock>>), LinkedList<RefCell<Subblock>>>, (KError, LinkedList<RefCell<Subblock>>)> {
-        let res = ll.head().unwrap().borrow_mut().try_use_as_page();
-        match res {
-            Ok(Ok(ut)) => {
-                Ok(Ok((ut, ll)))
+        let rest = page.ok().unwrap();
+        if let Ok(ut) = rest {
+            return Ok(Ok((ut, ll)));
+        }
+        let (earlier, later) = rest.err().unwrap();
+        match DeviceBlock::device_split_iter(ll, earlier, later, addr) {
+            Ok(ncur) => {
+                Ok(Err(ncur))
             },
-            Ok(Err((earlier, later))) => {
-                match DeviceBlock::device_split_iter(ll, earlier, later, addr) {
-                    Ok(ncur) => {
-                        Ok(Err(ncur))
-                    },
-                    Err((earlier, later, ll)) => {
-                        ll.head().unwrap().borrow_mut().unsplit(earlier, later);
-                        Err((KError::NotEnoughMemory, ll))
-                    }
-                }
-            },
-            Err(err) => {
-                Err((err, ll))
+            Err((earlier, later, ll)) => {
+                ll.get(i).unwrap().borrow_mut().deref_mut().unsplit(earlier, later);
+                Err((KError::NotEnoughMemory, ll))
             }
         }
     }
 
     fn get_device_page_untyped_ll(&mut self, ll: LinkedList<RefCell<Subblock>>, addr: usize) -> (result::Result<Untyped, KError>, LinkedList<RefCell<Subblock>>) {
+        assert!(self.caps.is_empty()); // not currently valid
         assert!(self.size_bits >= PAGE_4K_BITS);
         // be very careful with try! here.
-        let mut cur: LinkedList<RefCell<Subblock>>;
-        let tmp = match self.device_scan(addr) {
-            Ok(rm) => DeviceBlock::first_v(rm, ll, addr),
+        let mut ri = match self.device_scan(&ll, addr) {
+            Ok(ri) => ri,
             Err(err) => {
                 return (Err(err), ll);
             }
         };
-        match tmp {
-            Ok(Ok((ut, ll2))) => {
-                return (Ok(ut), ll2);
-            },
-            Ok(Err(iter)) => {
-                cur = iter;
-            },
-            Err((err, ll2)) => {
-                return (Err(err), ll2);
-            }
-        };
+        let mut cur: LinkedList<RefCell<Subblock>> = ll;
         loop {
-            match DeviceBlock::nonfirst_v(cur, addr) {
+            match DeviceBlock::iter_i(ri, cur, addr) {
                 Ok(Ok((ut, ll2))) => {
                     return (Ok(ut), ll2);
                 },
                 Ok(Err(iter)) => {
                     cur = iter;
+                    ri = 0;
                 },
                 Err((err, ll2)) => {
                     return (Err(err), ll2);
                 }
-            }
+            };
         }
     }
 
     pub fn get_device_page_untyped(&mut self, addr: usize) -> result::Result<Untyped, KError> {
+        assert!(self.contains(addr));
         let ll = mem::replace(&mut self.caps, LinkedList::Empty);
         let (res, ll) = self.get_device_page_untyped_ll(ll, addr);
         self.caps = ll;
@@ -310,10 +284,14 @@ impl DeviceBlock {
 
 impl ::core::fmt::Display for DeviceBlock {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        write!(f, "[{}", *self.caps.head().unwrap().borrow())?;
-        for iter in self.caps.tail().unwrap() {
-            let elem: RefMut<Subblock> = iter.borrow_mut();
-            write!(f, ", {}", *elem)?;
+        if self.caps.is_empty() {
+            write!(f, "[malformed")?;
+        } else {
+            write!(f, "[{}", *self.caps.head().unwrap().borrow())?;
+            for iter in self.caps.tail().unwrap() {
+                let elem: RefMut<Subblock> = iter.borrow_mut();
+                write!(f, ", {}", *elem)?;
+            }
         }
         write!(f, "] => {:#X}-{:#X}", self.start(), self.end())
     }
@@ -321,10 +299,14 @@ impl ::core::fmt::Display for DeviceBlock {
 
 impl ::core::fmt::Debug for DeviceBlock {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        write!(f, "DeviceBlock([{}", *self.caps.head().unwrap().borrow())?;
-        for iter in self.caps.tail().unwrap() {
-            let elem: RefMut<Subblock> = iter.borrow_mut();
-            write!(f, ", {}", *elem)?;
+        if self.caps.is_empty() {
+            write!(f, "[malformed")?;
+        } else {
+            write!(f, "DeviceBlock([{}", *self.caps.head().unwrap().borrow())?;
+            for iter in self.caps.tail().unwrap() {
+                let elem: RefMut<Subblock> = iter.borrow_mut();
+                write!(f, ", {}", *elem)?;
+            }
         }
         write!(f, " => {:#X}-{:#X})", self.start(), self.end())
     }
@@ -357,6 +339,7 @@ pub fn get_device_page(addr: usize) -> result::Result<Page4K, KError> {
             }
         }
     } else {
+        debug!("failed to lookup {:#X} due to block unavailable", addr);
         Err(KError::FailedLookup)
     }
 }
@@ -379,9 +362,9 @@ pub fn init_untyped(untyped: ::caps::CapRange, untyped_list: [::sel4::seL4_Untyp
             };
         }
     }
-    /* for dev in &devices {
-        writeln!(::sel4::out(), "dev {} of {} bits", dev, dev.size_bits);
-    } */
+    for dev in &devices {
+        debug!("dev {} of {} bits", dev, dev.size_bits);
+    }
     unsafe {
         assert!(DEVICES.is_none());
         DEVICES = Some(devices);

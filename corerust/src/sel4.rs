@@ -70,7 +70,7 @@ unsafe fn x64_sys_send_recv(syscall: i64, dest: u64, info: u64, mr0: u64, mr1: u
         pub tag: seL4_MessageInfo_t,                @   0 u64
         pub msg: [seL4_Word; 120usize],             @   1 u64 <---
         pub userData: seL4_Word,                    @ 121 u64
-        pub caps_or_badges: [seL4_Word; 3usize],    @ 124 u64 <---
+        pub caps_or_badges: [seL4_Word; 3usize],    @ 122 u64 <---
         pub receiveCNode: seL4_CPtr,                @ 125 u64
         pub receiveIndex: seL4_CPtr,                @ 126 u64
         pub receiveDepth: seL4_Word,                @ 127 u64
@@ -83,8 +83,8 @@ pub fn sel4_set_cap(i: u32, cptr: usize) {
     assert!((i as usize) < CAPS_OR_BADGES_LEN);
     unsafe {
         asm!(
-            // 8 comes from size of usize; 992 comes from caps_or_badges offset
-            "movq $0, %gs:992(,$1,8)"
+            // 8 comes from size of usize; 976 comes from caps_or_badges offset
+            "movq $0, %gs:976(,$1,8)"
             : /* no outputs */
             : "r" (cptr),
             "r" (i)
@@ -110,6 +110,23 @@ pub fn sel4_set_mr(i: u32, mr: usize) {
             : "volatile"
         );
     }
+}
+
+#[cfg(target_arch = "x86_64")]
+pub fn sel4_get_mr(i: u32) -> usize {
+    assert!((i as usize) < MSG_LEN);
+    let mr_out;
+    unsafe {
+        asm!(
+            // latter 8 comes from size of usize; earlier 8 comes from msg offset
+            "movq %gs:8(,$1,8), $0"
+            : "=r" (mr_out)
+            : "r" (i)
+            : "memory"
+            : "volatile"
+        );
+    }
+    mr_out
 }
 
 // errors
