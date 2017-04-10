@@ -2,13 +2,9 @@
 name = "searust_core"
 version = "0.1.0"
 authors = ["Cel Skeggs <git@celskeggs.com>"]
-build = "src/build.rs"
 
 [lib]
 crate-type = ["staticlib"]
-
-[build-dependencies]
-bindgen = "0.22"
 
 [dependencies]
 rlibc = "1.0"

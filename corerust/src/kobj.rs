@@ -1,4 +1,5 @@
 use ::sel4::*;
+use ::libsel4;
 
 pub fn sel4_untyped_retype(service: usize, objtype: usize, size_bits: usize, root: usize,
                            node_index: usize, node_depth: usize, node_offset: usize, num_objects: usize) -> KError {
@@ -31,17 +32,17 @@ pub fn sel4_untyped_retype(service: usize, objtype: usize, size_bits: usize, roo
             "source"
         };
         let lookup_failure_type = outputs.2;
-        match lookup_failure_type as u64 {
-            ::sel4::libsel4::seL4_LookupFailureType_seL4_InvalidRoot => {
+        match lookup_failure_type {
+            libsel4::seL4_LookupFailureType_seL4_InvalidRoot => {
                 debugc!("\n    --> failed to lookup {} cap: InvalidRoot", source_dest);
             }
-            ::sel4::libsel4::seL4_LookupFailureType_seL4_MissingCapability => {
+            libsel4::seL4_LookupFailureType_seL4_MissingCapability => {
                 debugc!("\n    --> failed to lookup {} cap: MissingCapability with {} bits left", source_dest, outputs.3);
             }
-            ::sel4::libsel4::seL4_LookupFailureType_seL4_DepthMismatch => {
+            libsel4::seL4_LookupFailureType_seL4_DepthMismatch => {
                 debugc!("\n    --> failed to lookup {} cap: DepthMismatch with {} bits left and {} bits resolved", source_dest, outputs.3, outputs.4);
             }
-            ::sel4::libsel4::seL4_LookupFailureType_seL4_GuardMismatch => {
+            libsel4::seL4_LookupFailureType_seL4_GuardMismatch => {
                 debugc!("\n    --> failed to lookup {} cap: GuardMismatch with {} bits left, guard {}, and {} bits of guard", source_dest, outputs.3, outputs.4, sel4_get_mr(4));
             }
             _ => {

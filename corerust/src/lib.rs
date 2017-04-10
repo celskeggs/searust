@@ -8,6 +8,7 @@
 #[macro_use]
 mod debug;
 pub mod sel4;
+mod libsel4;
 mod objs;
 mod kobj;
 mod device;
@@ -23,7 +24,7 @@ use core::fmt::Write;
 pub fn main() {
     match vga::VGAOutput::default() {
         Ok(mut screen) => {
-            writeln!(screen, "Hello, world!");
+            writeln!(screen, "Hello, world!").unwrap();
         }
         Err(err) => panic!("could not set up default VGA output: {:?}", err)
     }
