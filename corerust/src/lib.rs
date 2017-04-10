@@ -15,25 +15,15 @@ mod boot;
 mod caps;
 mod vspace;
 mod concurrency;
+mod vga;
 
-const VGA_BUFFER: usize = 0xb8000;
+use core::fmt::Write;
 
 pub fn main() {
-	// VGA test
-	let page = device::get_device_page(VGA_BUFFER).unwrap();
-	writeln!(sel4::out(), "device page: obtained {:?}!", page);
-	let page2 = match page.map_into_vspace(true) {
-		Ok(mut mapping) => {
-			{
-				let array = mapping.get_array();
-				for i in 0..200 {
-					array[i] = 0x55;
-				}
-			}
-			mapping.unmap()
-		}, Err((page, err)) => {
-			page
-		}
-	};
-	device::return_device_page(VGA_BUFFER, page2);
+	match vga::VGAOutput::default() {
+		Ok(mut screen) => {
+			writeln!(screen, "Hello, world!");
+		},
+		Err(err) => panic!("could not set up default VGA output: {:?}", err)
+	}
 }

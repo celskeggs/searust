@@ -359,6 +359,22 @@ pub fn return_device_page(addr: usize, page: Page4K) {
     }
 }
 
+pub fn get_mapped_device_page(addr: usize) -> result::Result<MappedPage4K, KError> {
+    let page = get_device_page(addr)?;
+    match page.map_into_vspace(true) {
+        Ok(mapping) => {
+            Ok(mapping)
+        }, Err((page, err)) => {
+            return_device_page(addr, page);
+            Err(err)
+        }
+    }
+}
+
+pub fn return_mapped_device_page(addr: usize, page: MappedPage4K) {
+    return_device_page(addr, page.unmap());
+}
+
 pub fn init_untyped(untyped: ::caps::CapRange, untyped_list: [::sel4::seL4_UntypedDesc; 230usize]) {
     let count = untyped.len();
     // these are sorted!
