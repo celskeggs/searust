@@ -35,5 +35,6 @@ libsel4: setup
 images/kernel.elf: kernel_elf
 	objcopy -O elf32-i386 stage/x86/pc99/kernel.elf $@
 
-install: common images/kernel.elf libsel4
+# libsel4 removed because direct bindings are no longer needed for rust code
+install: common images/kernel.elf
 	install -D -m 644 images/kernel.elf $(SYSROOT)/boot/sel4-dev
