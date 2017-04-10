@@ -8,8 +8,6 @@
     <option name="PARAMETERS" value="" />
     <module name="" />
     <envs />
-    <method>
-      <option name="Make" enabled="false" />
-    </method>
+    <method />
   </configuration>
 </component>

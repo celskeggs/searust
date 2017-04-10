@@ -6,23 +6,16 @@
 #![no_std]
 
 #[macro_use]
-mod debug;
-pub mod sel4;
-mod libsel4;
-mod objs;
-mod kobj;
-mod device;
+pub mod mantle;
+mod kobject;
+mod crust;
 mod memory;
-mod boot;
-mod caps;
-mod vspace;
-mod concurrency;
-mod vga;
+mod drivers;
 
 use core::fmt::Write;
 
 pub fn main() {
-    match vga::VGAOutput::default() {
+    match drivers::vga::VGAOutput::default() {
         Ok(mut screen) => {
             writeln!(screen, "Hello, world!").unwrap();
         }

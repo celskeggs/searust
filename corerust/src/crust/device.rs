@@ -1,11 +1,11 @@
-use ::objs::*;
-use ::sel4::*;
-use ::caps::*;
-use ::core::*;
-use ::memory::LinkedList;
-use ::core::cell::RefCell;
-use ::core::cell::RefMut;
-use ::core::ops::DerefMut;
+use memory::LinkedList;
+use crust::capalloc;
+use core;
+use mantle::kernel;
+use mantle::KError;
+use kobject::*;
+use core::cell::{RefCell, RefMut};
+use core::ops::DerefMut;
 
 struct Subblock {
     ut: Option<Untyped>,
@@ -40,7 +40,7 @@ impl Subblock {
     }
 
     pub fn take(&mut self) -> Untyped {
-        mem::replace(&mut self.ut, None).unwrap()
+        core::mem::replace(&mut self.ut, None).unwrap()
     }
 
     pub fn return_taken(&mut self, ut: Untyped) {
@@ -50,9 +50,9 @@ impl Subblock {
         self.ut = Some(ut);
     }
 
-    pub fn split(&mut self) -> result::Result<(Subblock, Subblock), KError> {
+    pub fn split(&mut self) -> core::result::Result<(Subblock, Subblock), KError> {
         let ut = self.take();
-        match ut.split(1, allocate_cap_slots(2)?) {
+        match ut.split(1, capalloc::allocate_cap_slots(2)?) {
             Ok(mut uset) => {
                 assert!(self.us.is_none());
                 let earlier = uset.take_front().unwrap();
@@ -64,27 +64,27 @@ impl Subblock {
             Err((err, ut, slots)) => {
                 assert!(self.ut.is_none());
                 self.ut = Some(ut);
-                ::caps::free_cap_slots(slots);
+                capalloc::free_cap_slots(slots);
                 Err(err)
             }
         }
     }
 
     pub fn unsplit(&mut self, earlierblk: Subblock, laterblk: Subblock) {
-        let mut uset = mem::replace(&mut self.us, None).unwrap();
+        let mut uset = core::mem::replace(&mut self.us, None).unwrap();
         uset.readd(laterblk.ut.unwrap());
         uset.readd(earlierblk.ut.unwrap());
         let (untyped, capslotset) = uset.free();
-        ::caps::free_cap_slots(capslotset);
+        capalloc::free_cap_slots(capslotset);
         self.return_taken(untyped);
     }
 
     pub fn needs_split(&self) -> bool {
-        assert!(self.size_bits >= PAGE_4K_BITS);
-        self.size_bits != PAGE_4K_BITS
+        assert!(self.size_bits >= kernel::PAGE_4K_BITS);
+        self.size_bits != kernel::PAGE_4K_BITS
     }
 
-    pub fn try_use_as_page(&mut self) -> result::Result<result::Result<Untyped, (Subblock, Subblock)>, KError> {
+    pub fn try_use_as_page(&mut self) -> core::result::Result<core::result::Result<Untyped, (Subblock, Subblock)>, KError> {
         if self.needs_split() {
             Ok(Err(self.split()?))
         } else {
@@ -93,8 +93,8 @@ impl Subblock {
     }
 }
 
-impl fmt::Display for Subblock {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl core::fmt::Display for Subblock {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         if let Some(ref ut) = self.ut {
             assert!(self.us.is_none());
             write!(f, "Subblock {} @ {:#X}-{:#X}", ut, self.start(), self.end())
@@ -138,7 +138,7 @@ impl DeviceBlock {
         self.start() <= addr && addr < self.end()
     }
 
-    fn device_scan<'a>(&'a self, ll: &'a LinkedList<RefCell<Subblock>>, addr: usize) -> result::Result<usize, KError> {
+    fn device_scan<'a>(&'a self, ll: &'a LinkedList<RefCell<Subblock>>, addr: usize) -> core::result::Result<usize, KError> {
         assert!(self.caps.is_empty()); // not currently valid
         assert!(self.contains(addr));
         if let Some((index, found)) = ll.find_and_index(|b| b.borrow().contains(addr)) {
@@ -160,7 +160,7 @@ impl DeviceBlock {
       * list, and returns a reference to the one that includes paddr.
       */
     // the implicit RefMut is the first element of the linked list
-    fn device_split_iter<'a>(ll: LinkedList<RefCell<Subblock>>, earlier: Subblock, later: Subblock, paddr: usize) -> result::Result<LinkedList<RefCell<Subblock>>, (Subblock, Subblock, LinkedList<RefCell<Subblock>>)> {
+    fn device_split_iter<'a>(ll: LinkedList<RefCell<Subblock>>, earlier: Subblock, later: Subblock, paddr: usize) -> core::result::Result<LinkedList<RefCell<Subblock>>, (Subblock, Subblock, LinkedList<RefCell<Subblock>>)> {
         let later_has_paddr: bool = later.contains(paddr);
         assert!(earlier.contains(paddr) != later_has_paddr);
         if later_has_paddr {
@@ -196,7 +196,7 @@ impl DeviceBlock {
         }
     }
 
-    fn iter_i(i: usize, ll: LinkedList<RefCell<Subblock>>, addr: usize) -> result::Result<result::Result<(Untyped, LinkedList<RefCell<Subblock>>), LinkedList<RefCell<Subblock>>>, (KError, LinkedList<RefCell<Subblock>>)> {
+    fn iter_i(i: usize, ll: LinkedList<RefCell<Subblock>>, addr: usize) -> core::result::Result<core::result::Result<(Untyped, LinkedList<RefCell<Subblock>>), LinkedList<RefCell<Subblock>>>, (KError, LinkedList<RefCell<Subblock>>)> {
         let page = ll.get(i).unwrap().borrow_mut().deref_mut().try_use_as_page();
         if let Err(err) = page {
             return Err((page.err().unwrap(), ll));
@@ -217,9 +217,9 @@ impl DeviceBlock {
         }
     }
 
-    fn get_device_page_untyped_ll(&mut self, ll: LinkedList<RefCell<Subblock>>, addr: usize) -> (result::Result<Untyped, KError>, LinkedList<RefCell<Subblock>>) {
+    fn get_device_page_untyped_ll(&mut self, ll: LinkedList<RefCell<Subblock>>, addr: usize) -> (core::result::Result<Untyped, KError>, LinkedList<RefCell<Subblock>>) {
         assert!(self.caps.is_empty()); // not currently valid
-        assert!(self.size_bits >= PAGE_4K_BITS);
+        assert!(self.size_bits >= kernel::PAGE_4K_BITS);
         // be very careful with try! here.
         let mut ri = match self.device_scan(&ll, addr) {
             Ok(ri) => ri,
@@ -244,9 +244,9 @@ impl DeviceBlock {
         }
     }
 
-    pub fn get_device_page_untyped(&mut self, addr: usize) -> result::Result<Untyped, KError> {
+    pub fn get_device_page_untyped(&mut self, addr: usize) -> core::result::Result<Untyped, KError> {
         assert!(self.contains(addr));
-        let ll = mem::replace(&mut self.caps, LinkedList::Empty);
+        let ll = core::mem::replace(&mut self.caps, LinkedList::Empty);
         let (res, ll) = self.get_device_page_untyped_ll(ll, addr);
         self.caps = ll;
         res
@@ -254,17 +254,17 @@ impl DeviceBlock {
 
     pub fn return_device_page_untyped(&mut self, addr: usize, untyped: Untyped) {
         // TODO: check this logic... I'm not sure things are being returned to the exact correct places...
-        assert!(self.size_bits >= PAGE_4K_BITS);
-        assert!(untyped.size_bits() == PAGE_4K_BITS);
+        assert!(self.size_bits >= kernel::PAGE_4K_BITS);
+        assert!(untyped.size_bits() == kernel::PAGE_4K_BITS);
         assert!(self.contains(addr));
         let mut foundref: RefMut<Subblock> = self.caps.find(|b| b.borrow().contains(addr)).unwrap().borrow_mut();
         let found: &mut Subblock = foundref.deref_mut();
         assert!(!found.is_available());
-        assert!(found.size_bits == PAGE_4K_BITS);
+        assert!(found.size_bits == kernel::PAGE_4K_BITS);
         found.return_taken(untyped);
     }
 
-    pub fn get_device_page(&mut self, addr: usize, slot: CapSlot) -> result::Result<Page4K, (KError, CapSlot)> {
+    pub fn get_device_page(&mut self, addr: usize, slot: CapSlot) -> core::result::Result<Page4K, (KError, CapSlot)> {
         match self.get_device_page_untyped(addr) {
             Ok(untyped) => {
                 match untyped.become_page_4k(slot) {
@@ -334,13 +334,13 @@ pub fn get_containing_block(addr: usize) -> Option<&'static mut DeviceBlock> {
     get_device_list().find_mut(|dev| dev.contains(addr))
 }
 
-pub fn get_device_page(addr: usize) -> result::Result<Page4K, KError> {
+pub fn get_device_page(addr: usize) -> core::result::Result<Page4K, KError> {
     if let Some(block) = get_containing_block(addr) {
-        let slot = allocate_cap_slot()?;
+        let slot = capalloc::allocate_cap_slot()?;
         match block.get_device_page(addr, slot) {
             Ok(page) => Ok(page),
             Err((err, slot)) => {
-                free_cap_slot(slot);
+                capalloc::free_cap_slot(slot);
                 Err(err)
             }
         }
@@ -353,13 +353,13 @@ pub fn get_device_page(addr: usize) -> result::Result<Page4K, KError> {
 pub fn return_device_page(addr: usize, page: Page4K) {
     if let Some(block) = get_containing_block(addr) {
         let slot = block.return_device_page(addr, page);
-        free_cap_slot(slot);
+        capalloc::free_cap_slot(slot);
     } else {
         panic!("attempt to return device page to block that never existed");
     }
 }
 
-pub fn get_mapped_device_page(addr: usize) -> result::Result<MappedPage4K, KError> {
+pub fn get_mapped_device_page(addr: usize) -> core::result::Result<MappedPage4K, KError> {
     let page = get_device_page(addr)?;
     match page.map_into_vspace(true) {
         Ok(mapping) => {
@@ -376,7 +376,7 @@ pub fn return_mapped_device_page(addr: usize, page: MappedPage4K) {
     return_device_page(addr, page.unmap());
 }
 
-pub fn init_untyped(untyped: ::caps::CapRange, untyped_list: [::sel4::seL4_UntypedDesc; 230usize]) {
+pub fn init_untyped(untyped: CapRange, untyped_list: [kernel::UntypedDesc; 230usize]) {
     let count = untyped.len();
     // these are sorted!
     let mut devices = ::memory::LinkedList::empty();
@@ -384,8 +384,8 @@ pub fn init_untyped(untyped: ::caps::CapRange, untyped_list: [::sel4::seL4_Untyp
     for ir in 0..count {
         let i = count - 1 - ir;
         let ent = untyped_list[i];
-        if ent.isDevice != 0 {
-            let newblock = DeviceBlock::new(Untyped::from_cap(untyped.nth(i).assert_populated(), ent.sizeBits), ent.paddr as usize);
+        if ent.is_device != 0 {
+            let newblock = DeviceBlock::new(Untyped::from_cap(untyped.nth(i).assert_populated(), ent.size_bits), ent.paddr as usize);
             assert!(newblock.end() <= last_addr);
             last_addr = newblock.start();
             devices = match devices.push(newblock) {

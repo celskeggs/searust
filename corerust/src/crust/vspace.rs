@@ -1,10 +1,10 @@
-use ::objs;
 use ::memory;
 use ::core;
-use ::sel4::KError;
+use ::mantle::KError;
+use ::mantle::kernel::PAGE_4K_SIZE;
 use ::core::cell::RefCell;
 use ::core::cell::RefMut;
-use ::concurrency::SingleThreaded;
+use ::mantle::concurrency::SingleThreaded;
 
 pub struct VRegion {
     // both page-aligned
@@ -14,8 +14,8 @@ pub struct VRegion {
 
 impl VRegion {
     fn new(start: usize, end: usize) -> VRegion {
-        assert!((start & (objs::PAGE_4K_SIZE - 1)) == 0);
-        assert!((end & (objs::PAGE_4K_SIZE - 1)) == 0);
+        assert!((start & (PAGE_4K_SIZE - 1)) == 0);
+        assert!((end & (PAGE_4K_SIZE - 1)) == 0);
         assert!(end > start);
         VRegion { start, end }
     }
@@ -30,7 +30,7 @@ impl VRegion {
     }
 
     fn chop_len(&mut self, length: usize) -> VRegion {
-        assert!((length & (objs::PAGE_4K_SIZE - 1)) == 0 && length > 0);
+        assert!((length & (PAGE_4K_SIZE - 1)) == 0 && length > 0);
         assert!(self.len() >= length);
         let out = VRegion::new(self.start, self.start + length);
         self.start += length;
@@ -69,8 +69,8 @@ impl VRegion {
     }
 
     pub fn to_4k_address(&self) -> usize {
-        assert!((self.start & (objs::PAGE_4K_SIZE - 1)) == 0);
-        assert!((self.end - self.start) == objs::PAGE_4K_SIZE);
+        assert!((self.start & (PAGE_4K_SIZE - 1)) == 0);
+        assert!((self.end - self.start) == PAGE_4K_SIZE);
         self.start
     }
 }
@@ -94,14 +94,14 @@ fn get_avail_regions_list() -> RefMut<'static, memory::LinkedList<VRegion>> {
 
 pub fn init_vspace(executable_start: usize, image_len: usize) {
     let region = &mut *get_avail_regions_list();
-    region.pushmut(VRegion::new(executable_start + image_len + objs::PAGE_4K_SIZE * 8, KERNEL_BASE_VADDR));
+    region.pushmut(VRegion::new(executable_start + image_len + PAGE_4K_SIZE * 8, KERNEL_BASE_VADDR));
     debug!("TODO: readd low-memory region");
     // region.pushmut(VRegion::new(objs::PAGE_2M_SIZE, executable_start));
     debug!("self was loaded to: {:#X}-{:#X}", executable_start, executable_start + image_len);
 }
 
 pub fn allocate_vregion(length: usize) -> core::result::Result<VRegion, KError> {
-    assert!((length & (objs::PAGE_4K_SIZE - 1)) == 0 && length > 0);
+    assert!((length & (PAGE_4K_SIZE - 1)) == 0 && length > 0);
     let rl: &mut memory::LinkedList<VRegion> = &mut *get_avail_regions_list();
     let (vregion, is_now_empty): (VRegion, bool) = {
         let h = rl.find_mut(|b| b.len() >= length);

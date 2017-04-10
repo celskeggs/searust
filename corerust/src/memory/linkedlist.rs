@@ -1,195 +1,5 @@
+use memory::alloc;
 use ::core;
-
-mod alloc {
-    // MEMORY ALLOCATION MACHINERY
-    const HEAP_KB: usize = 64;
-    const HEAP_U64: usize = HEAP_KB * (1024 / 8);
-
-    // each bucket is a multiple of 8 bytes. the maximum fixblk is 255 * 8 bytes == 2040 bytes, so we have 255 buckets.
-    static mut EARLY_HEAP: [u64; HEAP_U64] = [0; HEAP_U64]; // start with 64KB of memory
-    static mut BUCKETS: [*mut u64; 255] = [::core::ptr::null_mut(); 255];
-    static mut FIRST_FREE: usize = 0;
-
-    unsafe fn deref_seq(ptr: *mut u64) -> Option<*mut u64> {
-        if ptr.is_null() {
-            None
-        } else {
-            let target_addr: u64 = *ptr;
-            *ptr = 0;
-            Some(target_addr as *mut u64)
-        }
-    }
-
-    unsafe fn reref_seq(ptr: *mut u64, older: *mut u64) -> *mut u64 {
-        assert!(!ptr.is_null());
-        *ptr = older as u64;
-        ptr
-    }
-
-    pub fn alloc_fixblks(size: u8) -> Option<*mut u64> {
-        assert!(size != 0);
-        unsafe {
-            let ptr = BUCKETS[(size - 1) as usize];
-            if let Some(nptr) = deref_seq(ptr) {
-                BUCKETS[(size - 1) as usize] = nptr;
-                Some(ptr)
-            } else if FIRST_FREE + (size as usize) <= HEAP_U64 {
-                let nptr = &mut EARLY_HEAP[FIRST_FREE] as *mut u64;
-                FIRST_FREE += size as usize;
-                Some(nptr)
-            } else {
-                None
-            }
-        }
-    }
-
-    pub fn alloc_fix(size: u16) -> Option<*mut u64> {
-        assert!(size >= 1 && size <= 255 * 8);
-        alloc_fixblks(((size + 7) / 8) as u8)
-    }
-
-    pub unsafe fn dealloc_fixblks(ptr: *mut u64, size: u8) {
-        assert!(size != 0);
-        BUCKETS[(size - 1) as usize] = reref_seq(ptr, BUCKETS[(size - 1) as usize]);
-    }
-
-    pub unsafe fn dealloc_fix(ptr: *mut u64, size: u16) {
-        assert!(size >= 1 && size <= 255 * 8);
-        dealloc_fixblks(ptr, ((size + 7) / 8) as u8)
-    }
-}
-
-pub fn alloc_type<T>(x: T) -> core::result::Result<*mut T, T> {
-    let size: usize = ::core::mem::size_of::<T>();
-    assert!(size < 65536);
-    if let Some(ptr) = alloc::alloc_fix(size as u16) {
-        let cptr = ptr as *mut T;
-        unsafe {
-            ::core::ptr::write(cptr, x);
-        }
-        Ok(cptr)
-    } else {
-        Err(x)
-    }
-}
-
-pub unsafe fn dealloc_type<T>(ptr: *mut T) -> T {
-    assert!(!ptr.is_null());
-    let out = ::core::ptr::read(ptr);
-    // TODO: zero out first?
-    let size: usize = ::core::mem::size_of::<T>();
-    assert!(size < 65536);
-    alloc::dealloc_fix(ptr as *mut u64, size as u16);
-    out
-}
-
-pub struct Box<T> {
-    ptr: *mut T
-}
-
-impl<T> Box<T> {
-    pub fn newchk(x: T) -> core::result::Result<Box<T>, T> {
-        match alloc_type(x) {
-            Ok(ptr) => {
-                Ok(Box { ptr })
-            }
-            Err(x) => {
-                Err(x)
-            }
-        }
-    }
-
-    pub fn new(x: T) -> Box<T> {
-        match alloc_type(x) {
-            Ok(ptr) => {
-                Box { ptr }
-            }
-            Err(_) => {
-                panic!("could not allocate memory for box");
-            }
-        }
-    }
-
-    pub unsafe fn from_raw(raw: *mut T) -> Box<T> {
-        Box { ptr: raw }
-    }
-
-    pub fn into_raw(b: Box<T>) -> *mut T {
-        let out = b.ptr;
-        core::mem::forget(b);
-        out
-    }
-}
-
-impl<T> core::borrow::BorrowMut<T> for Box<T> {
-    fn borrow_mut(&mut self) -> &mut T {
-        unsafe {
-            &mut *self.ptr
-        }
-    }
-}
-
-impl<T> core::borrow::Borrow<T> for Box<T> {
-    fn borrow(&self) -> &T {
-        unsafe {
-            &*self.ptr
-        }
-    }
-}
-
-impl<T: core::fmt::Display> core::fmt::Display for Box<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::result::Result<(), core::fmt::Error> {
-        let deref: &T = &self;
-        write!(f, "{}", deref)
-    }
-}
-
-impl<T> core::ops::DerefMut for Box<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe {
-            &mut *self.ptr
-        }
-    }
-}
-
-impl<T> core::ops::Deref for Box<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        unsafe {
-            &*self.ptr
-        }
-    }
-}
-
-impl<T> core::convert::AsRef<T> for Box<T> {
-    fn as_ref(&self) -> &T {
-        unsafe {
-            &*self.ptr
-        }
-    }
-}
-
-impl<T> core::convert::AsMut<T> for Box<T> {
-    fn as_mut(&mut self) -> &mut T {
-        unsafe {
-            &mut *self.ptr
-        }
-    }
-}
-
-impl<T> core::convert::From<T> for Box<T> {
-    fn from(t: T) -> Box<T> {
-        Box::new(t)
-    }
-}
-
-impl<T> core::ops::Drop for Box<T> {
-    fn drop(&mut self) {
-        core::mem::drop(unsafe {
-            dealloc_type(self.ptr)
-        });
-    }
-}
 
 // TODO: make private
 pub struct Pair<T> {
@@ -203,7 +13,7 @@ pub enum LinkedList<T> {
 }
 
 fn cons<T>(head: T, tail: LinkedList<T>) -> core::result::Result<Pair<T>, (T, LinkedList<T>)> {
-    match alloc_type::<LinkedList<T>>(tail) {
+    match alloc::alloc_type::<LinkedList<T>>(tail) {
         Ok(tailref) => Ok(Pair::<T> { head: head, tail: tailref }),
         Err(tail) => Err((head, tail))
     }
@@ -212,11 +22,11 @@ fn cons<T>(head: T, tail: LinkedList<T>) -> core::result::Result<Pair<T>, (T, Li
 impl<T> Pair<T> {
     fn split(self) -> (T, LinkedList<T>) {
         unsafe {
-            let head: T = ::core::ptr::read(&self.head as *const T);
-            let tail: *mut LinkedList<T> = ::core::ptr::read((&self.tail) as *const *mut LinkedList<T>);
+            let head: T = core::ptr::read(&self.head as *const T);
+            let tail: *mut LinkedList<T> = core::ptr::read((&self.tail) as *const *mut LinkedList<T>);
             assert!(!tail.is_null());
-            ::core::mem::forget(self);
-            (head, dealloc_type(tail))
+            core::mem::forget(self);
+            (head, alloc::dealloc_type(tail))
         }
     }
 
@@ -256,8 +66,8 @@ impl<T> Pair<T> {
 
 impl<T> Drop for Pair<T> {
     fn drop(&mut self) {
-        ::core::mem::drop(unsafe {
-            dealloc_type(self.tail)
+        core::mem::drop(unsafe {
+            alloc::dealloc_type(self.tail)
         });
     }
 }
@@ -503,31 +313,8 @@ impl<T> LinkedList<T> {
             i += 1;
         }
     }
-
-    /*    pub fn iter_mut<'a>(&'a mut self) -> LinkedIterMut<'a, T> {
-            LinkedIterMut::<'a, T> { current: &mut self }
-        }*/
-}
-/*
-pub struct LinkedIterMut<'a, T: 'a> {
-    current: &'a mut LinkedList<T>
 }
 
-impl<'a, T> Iterator for LinkedIterMut<'a, T> {
-    type Item = &'a mut T;
-    fn next<'b>(&'b mut self) -> Option<&'a mut T> {
-        let cur: &'b mut LinkedList<T> = self.current;
-        let next: Option<(&'b mut T, &'b mut LinkedList<T>)> = cur.nextmut::<'b>();
-        match next {
-            Some((head, tail)) => {
-                self.current = tail;
-                Some(head)
-            },
-            None => None
-        }
-    }
-}
-*/
 pub struct LinkedIter<'a, T: 'a> {
     current: &'a LinkedList<T>
 }

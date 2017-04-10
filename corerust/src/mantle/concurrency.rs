@@ -1,4 +1,4 @@
-use ::core::*;
+use ::core::marker::Sync;
 
 // Used for now while stuff is single-threaded.
 pub struct SingleThreaded<T>(pub T);
