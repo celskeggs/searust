@@ -259,7 +259,7 @@ impl DeviceBlock {
         assert!(self.contains(addr));
         let mut foundref: RefMut<Subblock> = self.caps.find(|b| b.borrow().contains(addr)).unwrap().borrow_mut();
         let found: &mut Subblock = foundref.deref_mut();
-        assert!(found.is_available());
+        assert!(!found.is_available());
         assert!(found.size_bits == PAGE_4K_BITS);
         found.return_taken(untyped);
     }
@@ -279,6 +279,12 @@ impl DeviceBlock {
                 Err((err, slot))
             }
         }
+    }
+
+    pub fn return_device_page(&mut self, addr: usize, page: Page4K) -> CapSlot {
+        let (ut, cs) = page.free();
+        self.return_device_page_untyped(addr, ut);
+        cs
     }
 }
 
@@ -341,6 +347,15 @@ pub fn get_device_page(addr: usize) -> result::Result<Page4K, KError> {
     } else {
         debug!("failed to lookup {:#X} due to block unavailable", addr);
         Err(KError::FailedLookup)
+    }
+}
+
+pub fn return_device_page(addr: usize, page: Page4K) {
+    if let Some(block) = get_containing_block(addr) {
+        let slot = block.return_device_page(addr, page);
+        free_cap_slot(slot);
+    } else {
+        panic!("attempt to return device page to block that never existed");
     }
 }
 

@@ -243,11 +243,11 @@ pub type seL4_SlotRegion = libsel4::seL4_SlotRegion;
 pub type seL4_UntypedDesc = libsel4::seL4_UntypedDesc;
 
 #[no_mangle]
-pub extern fn rust_main(bootinfo_addr: usize) {
+pub extern fn rust_main(bootinfo_addr: usize, executable_start: usize) {
     let bootinfo = unsafe {
         (bootinfo_addr as *const libsel4::seL4_BootInfo).as_ref().unwrap()
     };
-    ::boot::set_bootinfo(bootinfo);
+    ::boot::set_bootinfo(bootinfo, executable_start);
     ::main();
     panic!("returned from main!");
 }

@@ -16,8 +16,10 @@ pub fn print_bootinfo(writer: &mut ::core::fmt::Write, bi: &::sel4::seL4_BootInf
     writeln!(writer, "  initThreadDomain = {}", bi.initThreadDomain)
 }
 
-pub fn set_bootinfo(bi: &::sel4::seL4_BootInfo) {
+pub fn set_bootinfo(bi: &::sel4::seL4_BootInfo, executable_start: usize) {
     print_bootinfo(::sel4::out(), bi).unwrap();
     ::device::init_untyped(::caps::CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untypedList);
     ::caps::init_cslots(::caps::CapRange::range(bi.empty.start as usize, bi.empty.end as usize));
+    let image_len = ((bi.userImageFrames.end - bi.userImageFrames.start) as usize) * ::objs::PAGE_4K_SIZE;
+    ::vspace::init_vspace(executable_start, image_len);
 }

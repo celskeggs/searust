@@ -13,16 +13,27 @@ mod device;
 mod memory;
 mod boot;
 mod caps;
+mod vspace;
 mod concurrency;
 
 const VGA_BUFFER: usize = 0xb8000;
 
 pub fn main() {
-	match device::get_device_page(VGA_BUFFER) {
-		Ok(page) => {
-			writeln!(sel4::out(), "device page: obtained {:?}!", page);
-		}, Err(err) => {
-			panic!("Error: {:?}", err);
+	// VGA test
+	let page = device::get_device_page(VGA_BUFFER).unwrap();
+	writeln!(sel4::out(), "device page: obtained {:?}!", page);
+	let page2 = match page.map_into_vspace(true) {
+		Ok(mut mapping) => {
+			{
+				let array = mapping.get_array();
+				for i in 0..200 {
+					array[i] = 0x55;
+				}
+			}
+			mapping.unmap()
+		}, Err((page, err)) => {
+			page
 		}
-	}
+	};
+	device::return_device_page(VGA_BUFFER, page2);
 }

@@ -392,6 +392,7 @@ impl CapSet {
 }
 
 pub const ROOT_SLOT: usize = ::sel4::libsel4::seL4_CapInitThreadCNode as u32 as usize;
+pub const ROOT_PAGEDIR: usize = ::sel4::libsel4::seL4_CapInitThreadVSpace as u32 as usize;
 pub const ROOT_BITS: usize = 64; // TODO: maybe this should be 32?
 
 static AVAILABLE_CAPS: SingleThreaded<RefCell<memory::LinkedList<CapRange>>> = SingleThreaded(RefCell::new(memory::LinkedList::empty()));

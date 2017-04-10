@@ -61,11 +61,9 @@ pub fn sel4_untyped_retype(service: usize, objtype: usize, size_bits: usize, roo
 
 pub fn sel4_cnode_delete(service: usize, index: usize, depth: u8) -> KError {
     let tag = sel4_messageinfo_new(libsel4::invocation_label_CNodeDelete, 0, 0, 2);
-    let mr0 = index;
-    let mr1 = (depth as usize) & 0xff;
 
     let outputs = unsafe {
-        sel4_call_with_mrs(service, tag, mr0, mr1, 0, 0)
+        sel4_call_with_mrs(service, tag, index, (depth as usize) & 0xff, 0, 0)
     };
     let output_tag = outputs.0;
     let result: KError = sel4_error_for_code(sel4_messageinfo_get_label(output_tag) as usize);
@@ -73,6 +71,58 @@ pub fn sel4_cnode_delete(service: usize, index: usize, depth: u8) -> KError {
     service, index, depth, result);
 
     if result != KError::NoError {
+        sel4_set_mr(0, outputs.1);
+        sel4_set_mr(1, outputs.2);
+        sel4_set_mr(2, outputs.3);
+        sel4_set_mr(3, outputs.4);
+    }
+
+    result
+}
+
+pub fn sel4_x86_page_map(service: usize, vroot: usize, vaddr: usize, rights: usize, vmattrs: usize) -> KError {
+    let tag = sel4_messageinfo_new(libsel4::arch_invocation_label_X86PageMap, 0, 1, 3);
+    sel4_set_cap(0, vroot);
+
+    let outputs = unsafe {
+        sel4_call_with_mrs(service, tag, vaddr, rights, vmattrs, 0)
+    };
+    let output_tag = outputs.0;
+    let result: KError = sel4_error_for_code(sel4_messageinfo_get_label(output_tag) as usize);
+
+    debugnl!("performing sel4_x86_page_map(service={}, vroot={}, vaddr={:#X}, rights={}, vmattrs={})",
+        service, vroot, vaddr, rights, vmattrs);
+    if result == KError::NoError {
+        debugc!(" --> success");
+    } else if result == KError::IllegalOperation {
+        debugc!("\n    --> illegal operation");
+    } else if result == KError::FailedLookup && outputs.1 == 0 {
+        debugc!("\n    --> failed lookup (probably no page table)");
+    } else {
+        debugc!("\n    --> unexplicated error {:?}", result);
+        sel4_set_mr(0, outputs.1);
+        sel4_set_mr(1, outputs.2);
+        sel4_set_mr(2, outputs.3);
+        sel4_set_mr(3, outputs.4);
+    }
+
+    result
+}
+
+pub fn sel4_x86_page_unmap(service: usize) -> KError {
+    let tag = sel4_messageinfo_new(libsel4::arch_invocation_label_X86PageUnmap, 0, 0, 0);
+
+    let outputs = unsafe {
+        sel4_call_with_mrs(service, tag, 0, 0, 0, 0)
+    };
+    let output_tag = outputs.0;
+    let result: KError = sel4_error_for_code(sel4_messageinfo_get_label(output_tag) as usize);
+
+    debugnl!("performing sel4_x86_page_unmap(service={})", service);
+    if result == KError::NoError {
+        debugc!(" --> success");
+    } else {
+        debugc!("\n    --> unexplicated error {:?}", result);
         sel4_set_mr(0, outputs.1);
         sel4_set_mr(1, outputs.2);
         sel4_set_mr(2, outputs.3);
