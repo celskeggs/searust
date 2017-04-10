@@ -8,10 +8,10 @@ use ::kobject::*;
 #[no_mangle]
 pub extern fn mantle_main(bootinfo: &BootInfo, executable_start: usize) {
     set_bootinfo(bootinfo, executable_start);
-    ::main();
+    ::main(bootinfo);
 }
 
-fn print_bootinfo(writer: &mut core::fmt::Write, bi: &BootInfo) -> core::fmt::Result {
+pub fn print_bootinfo(writer: &mut core::fmt::Write, bi: &BootInfo) -> core::fmt::Result {
     try!(writeln!(writer, "BootInfo:"));
     try!(writeln!(writer, "  nodeID = {}", bi.node_id));
     try!(writeln!(writer, "  numNodes = {}", bi.num_nodes));
