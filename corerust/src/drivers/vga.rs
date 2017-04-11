@@ -7,7 +7,7 @@ const VGA_BUFFER: usize = 0xb8000;
 
 pub struct VGA {
     addr: usize,
-    mapping: Option<MappedPage4K> // None only during deconstruction
+    mapping: Option<RegionMappedPage4K> // None only during deconstruction
 }
 
 pub const VGA_WIDTH: u8 = 80;
@@ -41,8 +41,8 @@ impl VGA {
         Ok(VGA { addr, mapping: Some(device::get_mapped_device_page(addr)?) })
     }
 
-    fn mapping(&mut self) -> &mut MappedPage4K {
-        let m: &mut Option<MappedPage4K> = &mut self.mapping;
+    fn mapping(&mut self) -> &mut RegionMappedPage4K {
+        let m: &mut Option<RegionMappedPage4K> = &mut self.mapping;
         if let &mut Some(ref mut page) = m {
             page
         } else {

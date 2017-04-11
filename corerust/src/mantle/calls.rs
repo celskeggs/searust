@@ -5,9 +5,9 @@ use mantle::kio;
 fn handle_err(outputs: (u32, usize, usize, usize, usize)) -> KError {
     let result: KError = KError::from_code(kernel::messageinfo_get_label(outputs.0 as kernel::MessageInfo));
     match result {
-        NoError => debugc!(" --> success"),
-        IllegalOperation => debugc!("\n    --> illegal operation"),
-        FailedLookup => {
+        KError::NoError => debugc!(" --> success"),
+        KError::IllegalOperation => debugc!("\n    --> illegal operation"),
+        KError::FailedLookup => {
             let is_source = outputs.1;
             assert!(is_source == 0 || is_source == 1);
             let source_dest = if is_source == 0 { "destination" } else { "source" };
@@ -82,4 +82,16 @@ pub fn x86_page_map(service: usize, vroot: usize, vaddr: usize, rights: usize, v
 pub fn x86_page_unmap(service: usize) -> KError {
     debugnl!("performing x86_page_unmap(service={})", service);
     unsafe { call_0(service, kernel::TAG_X86_PAGE_UNMAP, 0)}
+}
+
+pub fn x86_page_table_map(service: usize, vroot: usize, vaddr: usize, vmattrs: usize) -> KError {
+    debugnl!("performing x86_page_table_map(service={}, vroot={}, vaddr={:#X}, vmattrs={})",
+        service, vroot, vaddr, vmattrs);
+    kio::set_cap(0, vroot);
+    unsafe { call_2(service, kernel::TAG_X86_PAGETABLE_MAP, 1, vaddr, vmattrs) }
+}
+
+pub fn x86_page_table_unmap(service: usize) -> KError {
+    debugnl!("performing x86_page_table_unmap(service={})", service);
+    unsafe { call_0(service, kernel::TAG_X86_PAGETABLE_UNMAP, 0)}
 }

@@ -1,7 +1,7 @@
 use ::memory;
 use ::core;
 use ::mantle::KError;
-use ::mantle::kernel::PAGE_4K_SIZE;
+use ::mantle::kernel::{PAGE_4K_SIZE, PAGE_2M_SIZE};
 use ::core::cell::RefCell;
 use ::core::cell::RefMut;
 use ::mantle::concurrency::SingleThreaded;
@@ -23,6 +23,10 @@ impl VRegion {
     pub fn len(&self) -> usize {
         assert!(self.end >= self.start);
         self.end - self.start
+    }
+
+    pub fn start(&self) -> usize {
+        self.start
     }
 
     pub fn is_empty(&self) -> bool {
@@ -95,8 +99,7 @@ fn get_avail_regions_list() -> RefMut<'static, memory::LinkedList<VRegion>> {
 pub fn init_vspace(executable_start: usize, image_len: usize) {
     let region = &mut *get_avail_regions_list();
     region.pushmut(VRegion::new(executable_start + image_len + PAGE_4K_SIZE * 8, KERNEL_BASE_VADDR));
-    debug!("TODO: readd low-memory region");
-    // region.pushmut(VRegion::new(objs::PAGE_2M_SIZE, executable_start));
+    region.pushmut(VRegion::new(PAGE_2M_SIZE, executable_start));
     debug!("self was loaded to: {:#X}-{:#X}", executable_start, executable_start + image_len);
 }
 

@@ -67,6 +67,14 @@ impl Untyped {
             Err((err, capslot)) => Err((err, self, capslot))
         }
     }
+
+    pub fn become_page_table(self, capslot: CapSlot) -> core::result::Result<PageTable, (KError, Untyped, CapSlot)> {
+        assert!(self.size_bits == PAGE_4K_BITS);
+        match self.retype_raw_one(ObjectType::X86PageTableObject, 0, capslot) {
+            Ok(cap) => Ok(PageTable::from_retyping(cap, self)),
+            Err((err, capslot)) => Err((err, self, capslot))
+        }
+    }
 }
 
 impl core::fmt::Display for Untyped {

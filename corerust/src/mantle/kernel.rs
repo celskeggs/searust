@@ -7,6 +7,9 @@ pub const PAGE_4K_SIZE: usize = 1 << PAGE_4K_BITS;
 pub const PAGE_2M_BITS: u8 = 21;
 pub const PAGE_2M_SIZE: usize = 1 << PAGE_2M_BITS;
 
+pub const FAN_OUT_LIMIT_BITS: u8 = 8;
+pub const FAN_OUT_LIMIT: usize = 1 << FAN_OUT_LIMIT_BITS; // configured in kernel
+
 #[repr(u32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KError {

@@ -1,52 +1,155 @@
 use core;
+use crust;
 use memory::LinkedList;
 use mantle;
+use mantle::KError;
 use kobject::*;
 use mantle::kernel;
 
 pub struct UntypedAllocator {
     small_pages: LinkedList<Untyped>,
-    midsize_blocks: LinkedList<Untyped>,
     large_pages: LinkedList<Untyped>,
-    oversize_blocks: LinkedList<Untyped>
+    stashed: LinkedList<UntypedSet>,
 }
 
 impl UntypedAllocator {
-    pub fn mem_available(&self) -> (usize, usize, usize, usize, usize) {
-        let (mut oversize_mem, mut large_mem, mut midsize_mem, mut small_mem) = (0usize, 0usize, 0usize, 0usize);
-        for block in self.small_pages.into_iter() {
-            assert!(block.size_bytes() == kernel::PAGE_4K_SIZE);
-            small_mem += block.size_bytes();
+    pub fn add_oversize_block(&mut self, ut: Untyped) {
+        if ut.size_bits() <= kernel::PAGE_2M_BITS + kernel::FAN_OUT_LIMIT_BITS {
+            return self.add_huge_block(ut);
         }
-        for block in self.midsize_blocks.into_iter() {
-            assert!(block.size_bytes() > kernel::PAGE_4K_SIZE);
-            assert!(block.size_bytes() < kernel::PAGE_2M_SIZE);
-            midsize_mem += block.size_bytes();
+        // limits us to 128 GB under current settings, but the fan-out limit can be increased in the kernel if that's a problem
+        assert!(ut.size_bits() <= kernel::PAGE_2M_BITS + kernel::FAN_OUT_LIMIT_BITS * 2);
+        let mut goal_split_count = ut.size_bits() - (kernel::PAGE_2M_BITS + kernel::FAN_OUT_LIMIT_BITS);
+        assert!(goal_split_count <= kernel::FAN_OUT_LIMIT_BITS);
+        assert!(goal_split_count > 0);
+        let capset = match crust::capalloc::allocate_cap_slots(1 << goal_split_count) {
+            Ok(cs) => cs,
+            Err(err) => panic!("could not allocate capslots for memory branching: {:?}", err)
+        };
+        match ut.split(goal_split_count, capset) {
+            Ok(mut uts) => {
+                for i in 0 .. uts.count() {
+                    self.add_huge_block(uts.take_front().unwrap())
+                }
+                assert!(uts.take_front().is_none());
+                assert!(self.stashed.pushmut(uts).is_ok());
+            }, Err((err, ut, capset)) => {
+                panic!("could not split oversize untyped as part of initial memory branching: {:?}", err);
+            }
         }
-        for block in self.large_pages.into_iter() {
-            assert!(block.size_bytes() == kernel::PAGE_2M_SIZE);
-            large_mem += block.size_bytes();
-            debug!("next size: {} {}", block.size_bytes(), large_mem >> 10);
+    }
+
+    pub fn add_huge_block(&mut self, ut: Untyped) { // used for 2^22 to 2^29
+        let mut goal_split_count = ut.size_bits() - kernel::PAGE_2M_BITS;
+        assert!(goal_split_count <= kernel::FAN_OUT_LIMIT_BITS);
+        assert!(goal_split_count > 0);
+        let capset = match crust::capalloc::allocate_cap_slots(1 << goal_split_count) {
+            Ok(cs) => cs,
+            Err(err) => panic!("could not allocate capslots for memory branching: {:?}", err)
+        };
+        match ut.split(goal_split_count, capset) {
+            Ok(mut uts) => {
+                for i in 0 .. uts.count() {
+                    self.add_large_page(uts.take_front().unwrap())
+                }
+                assert!(uts.take_front().is_none());
+                assert!(self.stashed.pushmut(uts).is_ok());
+            }, Err((err, ut, capset)) => {
+                panic!("could not split huge untyped as part of initial memory branching: {:?}", err);
+            }
         }
-        for block in self.oversize_blocks.into_iter() {
-            assert!(block.size_bytes() > kernel::PAGE_2M_SIZE);
-            oversize_mem += block.size_bytes();
+    }
+
+    pub fn add_large_page(&mut self, ut: Untyped) {
+        assert!(ut.size_bits() == kernel::PAGE_2M_BITS);
+        self.large_pages.pushmut(ut).unwrap()
+    }
+
+    pub fn add_midsize_block(&mut self, ut: Untyped) {
+        assert!(ut.size_bits() > kernel::PAGE_4K_BITS && ut.size_bits() < kernel::PAGE_2M_BITS);
+        let mut goal_split_count = ut.size_bits() - kernel::PAGE_4K_BITS; // 1 - 8
+        // should hopefully be configured as this:
+        assert!(kernel::FAN_OUT_LIMIT_BITS >= 8);
+        // should hopefully be limited like this:
+        // (small: 12 bits, large: 21 bits -- largest is 20 bits which means a 256-split)
+        assert!(goal_split_count <= 8 && goal_split_count > 0);
+        let capset = match crust::capalloc::allocate_cap_slots(1 << goal_split_count) {
+            Ok(cs) => cs,
+            Err(err) => panic!("could not allocate capslots for memory branching: {:?}", err)
+        };
+        match ut.split(goal_split_count, capset) {
+            Ok(mut uts) => {
+                for i in 0 .. uts.count() {
+                    self.add_small_page(uts.take_front().unwrap())
+                }
+                assert!(uts.take_front().is_none());
+                assert!(self.stashed.pushmut(uts).is_ok());
+            }, Err((err, ut, capset)) => {
+                panic!("could not split small untyped as part of initial memory branching: {:?}", err);
+            }
         }
-        (oversize_mem, large_mem, midsize_mem, small_mem, oversize_mem + midsize_mem + large_mem + small_mem)
+    }
+
+    pub fn add_small_page(&mut self, ut: Untyped) {
+        assert!(ut.size_bits() == kernel::PAGE_4K_BITS);
+        self.small_pages.pushmut(ut).unwrap()
+    }
+
+    pub fn add_initial_block(&mut self, ut: Untyped) {
+        if ut.size_bits() > kernel::PAGE_2M_BITS {
+            self.add_oversize_block(ut);
+        } else if ut.size_bits() == kernel::PAGE_2M_BITS {
+            self.add_large_page(ut);
+        } else if ut.size_bits() > kernel::PAGE_4K_BITS {
+            self.add_midsize_block(ut);
+        } else if ut.size_bits() == kernel::PAGE_4K_BITS {
+            self.add_small_page(ut);
+        } else {
+            panic!("unexpected block is smaller than 4K");
+        }
+    }
+
+    pub fn allocate_large_page(&mut self) -> core::result::Result<Untyped, KError> {
+        self.large_pages.popmut().ok_or(KError::NotEnoughMemory)
+    }
+
+    pub fn allocate_small_page(&mut self) -> core::result::Result<Untyped, KError> {
+        if self.small_pages.is_empty() {
+            // TODO: make this actually work in low-memory conditions, because currently it won't be able to provide enough small pages without needing memory itself
+
+            // let's take a large page, cut it up a bit (so that we can treat it as midsize pages) and add it to the pile
+            let cslots = crust::capalloc::allocate_cap_slots(2)?;
+            let large_page = match self.allocate_large_page() {
+                Ok(page) => page,
+                Err(err) => {
+                    crust::capalloc::free_cap_slots(cslots);
+                    return Err(err);
+                }
+            };
+            let mut untypeds: UntypedSet = match large_page.split(1, cslots) {
+                Ok(uts) => uts,
+                Err((err, ut, cslots)) => {
+                    crust::capalloc::free_cap_slots(cslots);
+                    self.add_large_page(ut);
+                    return Err(err);
+                }
+            };
+            self.add_midsize_block(untypeds.take_front().unwrap());
+            self.add_midsize_block(untypeds.take_front().unwrap());
+            assert!(!untypeds.remaining());
+            self.stashed.pushmut(untypeds);
+        }
+        Ok(self.small_pages.popmut().unwrap())
     }
 
     pub fn print_info(&self, writer: &mut core::fmt::Write) -> core::fmt::Result {
-        let (oversize_mem, large_mem, midsize_mem, small_mem, all_mem) = self.mem_available();
         writeln!(writer, "memory info:")?;
-        writeln!(writer, "  number of oversize blocks: {}", self.oversize_blocks.len())?;
-        writeln!(writer, "    {} KB", oversize_mem >> 10)?;
         writeln!(writer, "  number of large blocks: {}", self.large_pages.len())?;
-        writeln!(writer, "    {} KB", large_mem >> 10)?;
-        writeln!(writer, "  number of midsize blocks: {}", self.midsize_blocks.len())?;
-        writeln!(writer, "    {} KB", midsize_mem >> 10)?;
+        writeln!(writer, "    {} KB", self.large_pages.len() * 2048)?;
         writeln!(writer, "  number of small blocks: {}", self.small_pages.len())?;
-        writeln!(writer, "    {} KB", small_mem >> 10)?;
-        writeln!(writer, "  total memory: {} KB = {} MB", all_mem >> 10, all_mem >> 20)
+        writeln!(writer, "    {} KB", self.small_pages.len() * 4)?;
+        let all_mem = self.small_pages.len() * 4 + self.large_pages.len() * 2048;
+        writeln!(writer, "  total memory: {} KB = {} MB", all_mem, all_mem >> 10)
     }
 }
 
@@ -54,9 +157,8 @@ impl UntypedAllocator {
 static mut ALLOCATOR: UntypedAllocator =
     UntypedAllocator {
         small_pages: LinkedList::empty(),
-        midsize_blocks: LinkedList::empty(),
         large_pages: LinkedList::empty(),
-        oversize_blocks: LinkedList::empty()
+        stashed: LinkedList::empty()
     };
 
 pub fn get_allocator() -> &'static mut UntypedAllocator {
@@ -70,20 +172,42 @@ pub fn init_untyped(untyped: CapRange, untyped_list: [kernel::UntypedDesc; 230us
         let i = count - 1 - ir;
         let ent = untyped_list[i];
         if ent.is_device == 0 {
-            let ll =
-                if ent.size_bits > kernel::PAGE_2M_BITS {
-                    &mut alloc.oversize_blocks
-                } else if ent.size_bits == kernel::PAGE_2M_BITS {
-                    &mut alloc.large_pages
-                } else if ent.size_bits > kernel::PAGE_4K_BITS {
-                    &mut alloc.midsize_blocks
-                } else if ent.size_bits == kernel::PAGE_4K_BITS {
-                    &mut alloc.small_pages
-                } else {
-                    panic!("unexpected block is smaller than 4K");
-                };
-            ll.pushmut(Untyped::from_cap(untyped.nth(i).assert_populated(), ent.size_bits)).unwrap();
+            alloc.add_initial_block(Untyped::from_cap(untyped.nth(i).assert_populated(), ent.size_bits));
         }
     }
     alloc.print_info(mantle::debug());
+}
+
+pub fn allocate_untyped_4k() -> core::result::Result<Untyped, KError> {
+    get_allocator().allocate_small_page()
+}
+
+pub fn allocate_page4k() -> core::result::Result<Page4K, KError> {
+    let slot = crust::capalloc::allocate_cap_slot()?;
+    let ut = match allocate_untyped_4k() {
+        Ok(ut) => ut,
+        Err(err) => {
+            crust::capalloc::free_cap_slot(slot);
+            return Err(err);
+        }
+    };
+    match ut.become_page_4k(slot) {
+        Ok(page) => Ok(page),
+        Err((err, ut, cs)) => {
+            crust::capalloc::free_cap_slot(cs);
+            free_untyped_4k(ut);
+            Err(err)
+        }
+    }
+}
+
+pub fn free_untyped_4k(ut: Untyped) {
+    assert!(ut.size_bits() == kernel::PAGE_4K_BITS);
+    get_allocator().add_small_page(ut);
+}
+
+pub fn free_page4k(page: Page4K) {
+    let (ut, cs) = page.free();
+    free_untyped_4k(ut);
+    crust::capalloc::free_cap_slot(cs);
 }

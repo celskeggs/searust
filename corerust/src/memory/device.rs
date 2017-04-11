@@ -359,7 +359,7 @@ pub fn return_device_page(addr: usize, page: Page4K) {
     }
 }
 
-pub fn get_mapped_device_page(addr: usize) -> core::result::Result<MappedPage4K, KError> {
+pub fn get_mapped_device_page(addr: usize) -> core::result::Result<RegionMappedPage4K, KError> {
     let page = get_device_page(addr)?;
     match page.map_into_vspace(true) {
         Ok(mapping) => {
@@ -372,7 +372,7 @@ pub fn get_mapped_device_page(addr: usize) -> core::result::Result<MappedPage4K,
     }
 }
 
-pub fn return_mapped_device_page(addr: usize, page: MappedPage4K) {
+pub fn return_mapped_device_page(addr: usize, page: RegionMappedPage4K) {
     return_device_page(addr, page.unmap());
 }
 
