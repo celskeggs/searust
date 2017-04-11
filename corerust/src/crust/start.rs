@@ -33,7 +33,7 @@ fn set_bootinfo(bi: &BootInfo, executable_start: usize) {
     print_bootinfo(mantle::debug(), bi).unwrap();
     crust::capalloc::init_cslots(CapRange::range(bi.empty.start as usize, bi.empty.end as usize));
     crust::vspace::init_vspace(executable_start, image_len);
-    memory::untyped::init_untyped(CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untyped_list);
     memory::init_allocator();
+    memory::untyped::init_untyped(CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untyped_list);
     memory::device::init_untyped(CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untyped_list);
 }

@@ -1,5 +1,7 @@
 use ::core;
 
+const TRACE: bool = false;
+
 mod fixed_alloc {
     const HEAP_KB: usize = 64;
     const HEAP_U64: usize = HEAP_KB * (1024 / 8);
@@ -12,7 +14,9 @@ mod fixed_alloc {
             if FIRST_FREE + (size as usize) <= HEAP_U64 {
                 let nptr = &mut EARLY_HEAP[FIRST_FREE] as *mut u64;
                 FIRST_FREE += size as usize;
-                debug!("allocated {} blocks from unallocated memory --> {}/{}", size, FIRST_FREE, HEAP_U64);
+                if super::TRACE {
+                    debug!("allocated {} blocks from unallocated memory --> {}/{}", size, FIRST_FREE, HEAP_U64);
+                }
                 Some(nptr)
             } else {
                 None
@@ -107,7 +111,9 @@ mod dynamic_alloc {
             }
             let ptr = (self.next_avail + self.vregion.start()) as *mut u64;
             self.next_avail += real_size;
-            debug!("allocated {} blocks from unallocated memory --> {}/{}/{}", size, self.next_avail / 8, self.next_unalloc / 8, self.vregion.len() / 8);
+            if super::TRACE {
+                debug!("allocated {} blocks from unallocated memory --> {}/{}/{}", size, self.next_avail / 8, self.next_unalloc / 8, self.vregion.len() / 8);
+            }
             Some(ptr)
         }
     }
@@ -157,7 +163,9 @@ mod recycle_alloc {
             let ptr = BUCKETS[(size - 1) as usize];
             if let Some(nptr) = deref_seq(ptr) {
                 BUCKETS[(size - 1) as usize] = nptr;
-                debug!("allocated {} blocks from recycled memory", size);
+                if super::TRACE {
+                    debug!("allocated {} blocks from recycled memory", size);
+                }
                 Some(ptr)
             } else {
                 None
@@ -203,7 +211,9 @@ pub unsafe fn dealloc_type<T>(ptr: *mut T) -> T {
     // TODO: zero out first?
     let size: usize = core::mem::size_of::<T>();
     assert!(size < 65536);
-    debug!("deallocated {} bytes", size);
+    if TRACE {
+        debug!("deallocated {} bytes", size);
+    }
     recycle_alloc::dealloc_fix(ptr as *mut u64, size as u16);
     out
 }

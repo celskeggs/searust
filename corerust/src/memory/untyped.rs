@@ -62,7 +62,7 @@ impl UntypedAllocator {
 
     pub fn add_large_page(&mut self, ut: Untyped) {
         assert!(ut.size_bits() == kernel::PAGE_2M_BITS);
-        self.large_pages.pushmut(ut).unwrap()
+        assert!(self.large_pages.pushmut(ut).is_ok());
     }
 
     pub fn add_midsize_block(&mut self, ut: Untyped) {
@@ -92,7 +92,7 @@ impl UntypedAllocator {
 
     pub fn add_small_page(&mut self, ut: Untyped) {
         assert!(ut.size_bits() == kernel::PAGE_4K_BITS);
-        self.small_pages.pushmut(ut).unwrap()
+        assert!(self.small_pages.pushmut(ut).is_ok());
     }
 
     pub fn add_initial_block(&mut self, ut: Untyped) {
@@ -137,7 +137,7 @@ impl UntypedAllocator {
             self.add_midsize_block(untypeds.take_front().unwrap());
             self.add_midsize_block(untypeds.take_front().unwrap());
             assert!(!untypeds.remaining());
-            self.stashed.pushmut(untypeds);
+            assert!(self.stashed.pushmut(untypeds).is_ok());
         }
         Ok(self.small_pages.popmut().unwrap())
     }
@@ -171,7 +171,21 @@ pub fn init_untyped(untyped: CapRange, untyped_list: [kernel::UntypedDesc; 230us
     for ir in 0..count {
         let i = count - 1 - ir;
         let ent = untyped_list[i];
-        if ent.is_device == 0 {
+        if ent.is_device == 0 && ent.size_bits == kernel::PAGE_4K_BITS {
+            alloc.add_initial_block(Untyped::from_cap(untyped.nth(i).assert_populated(), ent.size_bits));
+        }
+    }
+    for ir in 0..count {
+        let i = count - 1 - ir;
+        let ent = untyped_list[i];
+        if ent.is_device == 0 && ent.size_bits != kernel::PAGE_4K_BITS && ent.size_bits < kernel::PAGE_2M_BITS {
+            alloc.add_initial_block(Untyped::from_cap(untyped.nth(i).assert_populated(), ent.size_bits));
+        }
+    }
+    for ir in 0..count {
+        let i = count - 1 - ir;
+        let ent = untyped_list[i];
+        if ent.is_device == 0 && ent.size_bits >= kernel::PAGE_2M_BITS {
             alloc.add_initial_block(Untyped::from_cap(untyped.nth(i).assert_populated(), ent.size_bits));
         }
     }
