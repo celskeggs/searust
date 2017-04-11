@@ -1,8 +1,7 @@
 // a crust is full of resources
 
 pub mod start;
-mod capalloc;
-pub mod device;
+pub mod capalloc;
 pub mod vspace;
 
 // TODO: find a better place

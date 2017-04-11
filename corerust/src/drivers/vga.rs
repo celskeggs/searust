@@ -1,6 +1,6 @@
 use ::core;
 use ::kobject::*;
-use ::crust::device;
+use ::memory::device;
 use ::mantle::KError;
 
 const VGA_BUFFER: usize = 0xb8000;
