@@ -35,10 +35,12 @@ mod dynamic_alloc {
         vregion: VRegion,
         next_avail: usize,
         next_unalloc: usize,
-        pages: LinkedList<FixedMappedPage4K>
+        pages: LinkedList<FixedMappedPage4K>,
+        is_recursing: bool
     }
 
     const VREGION_BITS: u8 = 28; // 256 MB
+    const ALLOCATION_BUFFER: usize = kernel::PAGE_4K_SIZE * 8;
 
     impl DynamicAllocator {
         fn new() -> core::result::Result<DynamicAllocator, KError> {
@@ -46,7 +48,7 @@ mod dynamic_alloc {
             // basic sanity checking so we can make these assumptions later
             assert!(vregion.start() & (kernel::PAGE_4K_SIZE - 1) == 0);
             assert!(vregion.len() == (1 << VREGION_BITS));
-            Ok(DynamicAllocator { vregion, next_avail: 0, next_unalloc: 0, pages: LinkedList::empty() })
+            Ok(DynamicAllocator { vregion, next_avail: 0, next_unalloc: 0, pages: LinkedList::empty(), is_recursing: false })
         }
 
         fn add_fresh_page(&mut self) -> core::result::Result<(), KError> {
@@ -72,20 +74,36 @@ mod dynamic_alloc {
 
         // ensure that we're at least to this point
         fn alloc_forward(&mut self, min_unalloc: usize) -> core::result::Result<(), KError> {
-            while self.next_unalloc < min_unalloc {
-                self.add_fresh_page()?;
+            if self.is_recursing {
+                if self.next_unalloc >= min_unalloc { // well... good enough for now?
+                    Ok(())
+                } else {
+                    panic!("recursive dynamic memory allocation!");
+                }
+            } else {
+                self.is_recursing = true;
+                // we include ALLOCATION_BUFFER here so that we always try to have extra room
+                while self.next_unalloc < min_unalloc + ALLOCATION_BUFFER {
+                    if let Err(err) = self.add_fresh_page() {
+                        self.is_recursing = false;
+                        if self.next_unalloc >= min_unalloc { // well... good enough for now?
+                            return Ok(());
+                        } else {
+                            return Err(err);
+                        }
+                    }
+                }
+                self.is_recursing = false;
+                Ok(())
             }
-            Ok(())
         }
 
         fn alloc_fixblks(&mut self, size: u8) -> Option<*mut u64> {
             let real_size = (size as usize) * 8;
-            if self.next_avail + real_size > self.next_unalloc {
-                let until = self.next_avail + real_size;
-                if let Err(err) = self.alloc_forward(until) {
-                    debug!("Could not allocate additional dynamic memory: {:?}", err);
-                    return None;
-                }
+            let until = self.next_avail + real_size;
+            if let Err(err) = self.alloc_forward(until) {
+                debug!("Could not allocate additional dynamic memory: {:?}", err);
+                return None;
             }
             let ptr = (self.next_avail + self.vregion.start()) as *mut u64;
             self.next_avail += real_size;
