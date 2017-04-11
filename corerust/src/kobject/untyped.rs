@@ -21,6 +21,10 @@ impl Untyped {
         self.size_bits
     }
 
+    pub fn size_bytes(&self) -> usize {
+        1 << (self.size_bits as usize)
+    }
+
     fn retype_raw(&self, objtype: ObjectType, size_bits: u8, mut capslots: CapSlotSet)
                   -> core::result::Result<CapSet, (KError, CapSlotSet)> {
         assert!(capslots.capacity() > 0);

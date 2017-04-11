@@ -19,6 +19,7 @@ pub fn main(bootinfo: &mantle::kernel::BootInfo) {
         Ok(mut screen) => {
             writeln!(screen, "Hello, world!").unwrap();
             crust::start::print_bootinfo(&mut screen, bootinfo).unwrap();
+            memory::untyped::get_allocator().print_info(&mut screen).unwrap();
         }
         Err(err) => panic!("could not set up default VGA output: {:?}", err)
     }
