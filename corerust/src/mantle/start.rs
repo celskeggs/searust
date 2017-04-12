@@ -14,6 +14,7 @@ pub unsafe extern fn _start() {
     asm!("
 .extern __executable_start
     add $$65536, %rsp
+    andq $$0xfffffffffffffff0, %rsp
     movq $$__executable_start, %rsi
     call mantle_start
 _halt:
