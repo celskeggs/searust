@@ -15,12 +15,10 @@ mod drivers;
 use core::fmt::Write;
 
 pub fn main(bootinfo: &mantle::kernel::BootInfo) {
-    match drivers::vga::VGAOutput::default() {
-        Ok(mut screen) => {
-            writeln!(screen, "Hello, world!").unwrap();
-            crust::start::print_bootinfo(&mut screen, bootinfo).unwrap();
-            memory::untyped::get_allocator().print_info(&mut screen).unwrap();
-        }
-        Err(err) => panic!("could not set up default VGA output: {:?}", err)
-    }
+    let mut com1: drivers::serial::HardwareSerial = drivers::serial::COM1.configure(115200);
+    com1.send_str("HELLO SERIAL WORLD\n");
+    let line = com1.recv_line();
+    com1.send_str("RECEIVED: '");
+    com1.send_str(line.as_str());
+    com1.send_str("'\n");
 }

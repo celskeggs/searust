@@ -7,15 +7,19 @@ use memory::Box;
 
 struct DebugOutput;
 
+const DEBUG_ON: bool = false;
+
 impl Write for DebugOutput {
     fn write_str(&mut self, s: &str) -> Result {
-        for c in s.bytes() {
-            kio::debug_put_char(c);
-        }
-        let mut rmut: core::cell::RefMut<Option<&'static mut Write>> = DEBUG_MIRROR.get().borrow_mut();
-        let rmutr: &mut Option<&'static mut Write> = rmut.deref_mut();
-        if let &mut Some(ref mut w) = rmutr {
-            w.write_str(s);
+        if DEBUG_ON {
+            for c in s.bytes() {
+                kio::debug_put_char(c);
+            }
+            let mut rmut: core::cell::RefMut<Option<&'static mut Write>> = DEBUG_MIRROR.get().borrow_mut();
+            let rmutr: &mut Option<&'static mut Write> = rmut.deref_mut();
+            if let &mut Some(ref mut w) = rmutr {
+                w.write_str(s);
+            }
         }
         Ok(())
     }

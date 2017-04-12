@@ -1,6 +1,7 @@
 use ::core;
 
 const TRACE: bool = false;
+pub const MAX_ALLOC_LEN: usize = 255 * 8;
 
 mod fixed_alloc {
     const HEAP_KB: usize = 64;
@@ -180,11 +181,6 @@ mod recycle_alloc {
         assert!(size != 0);
         BUCKETS[(size - 1) as usize] = reref_seq(ptr, BUCKETS[(size - 1) as usize]);
     }
-
-    pub unsafe fn dealloc_fix(ptr: *mut u64, size: u16) {
-        assert!(size >= 1 && size <= 255 * 8);
-        dealloc_fixblks(ptr, ((size + 7) / 8) as u8)
-    }
 }
 
 pub fn alloc_fix(size: u16) -> Option<*mut u64> {
@@ -208,6 +204,11 @@ pub fn alloc_type<T>(x: T) -> core::result::Result<*mut T, T> {
     }
 }
 
+pub unsafe fn dealloc_fix(ptr: *mut u64, size: u16) {
+    assert!(size >= 1 && size <= 255 * 8);
+    recycle_alloc::dealloc_fixblks(ptr, ((size + 7) / 8) as u8)
+}
+
 pub unsafe fn dealloc_type<T>(ptr: *mut T) -> T {
     assert!(!ptr.is_null());
     let out = core::ptr::read(ptr);
@@ -217,7 +218,7 @@ pub unsafe fn dealloc_type<T>(ptr: *mut T) -> T {
     if TRACE {
         debug!("deallocated {} bytes", size);
     }
-    recycle_alloc::dealloc_fix(ptr as *mut u64, size as u16);
+    dealloc_fix(ptr as *mut u64, size as u16);
     out
 }
 

@@ -10,7 +10,7 @@ use core::fmt::Write;
 #[no_mangle]
 pub extern fn mantle_main(bootinfo: &BootInfo, executable_start: usize) {
     set_bootinfo(bootinfo, executable_start);
-    //::main(bootinfo);
+    ::main(bootinfo);
 }
 
 pub fn print_bootinfo(writer: &mut core::fmt::Write, bi: &BootInfo) -> core::fmt::Result {

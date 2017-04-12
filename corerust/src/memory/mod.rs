@@ -1,6 +1,8 @@
 mod alloc;
 mod mbox;
 mod linkedlist;
+mod malloc;
+pub mod string;
 pub mod device;
 pub mod untyped;
 

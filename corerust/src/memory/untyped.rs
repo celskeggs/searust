@@ -93,7 +93,7 @@ impl UntypedAllocator {
     pub fn add_small_page(&mut self, ut: Untyped) {
         assert!(ut.size_bits() == kernel::PAGE_4K_BITS);
         assert!(self.small_pages.pushmut(ut).is_ok());
-        debug!("adding small page => {}", self.small_pages.len());
+        //debug!("adding small page => {}", self.small_pages.len());
     }
 
     pub fn add_initial_block(&mut self, ut: Untyped) {
@@ -141,7 +141,7 @@ impl UntypedAllocator {
             assert!(!untypeds.remaining());
             assert!(self.stashed.pushmut(untypeds).is_ok());
         }
-        debug!("getting small page...");
+        // debug!("getting small page...");
         Ok(self.small_pages.popmut().unwrap())
     }
 
@@ -200,11 +200,11 @@ pub fn allocate_untyped_4k() -> core::result::Result<Untyped, KError> {
 }
 
 pub fn allocate_page4k() -> core::result::Result<Page4K, KError> {
-    debug!("tried to allocate page4k");
+    // debug!("tried to allocate page4k");
     let slot = match crust::capalloc::allocate_cap_slot() {
         Ok(ut) => ut,
         Err(err) => {
-            debug!(" --> failed due to allocate_cap_slot");
+            // debug!(" --> failed due to allocate_cap_slot");
             return Err(err);
         }
     };
@@ -212,7 +212,7 @@ pub fn allocate_page4k() -> core::result::Result<Page4K, KError> {
         Ok(ut) => ut,
         Err(err) => {
             crust::capalloc::free_cap_slot(slot);
-            debug!(" --> failed due to allocate_untyped_4k");
+            // debug!(" --> failed due to allocate_untyped_4k");
             return Err(err);
         }
     };
@@ -221,7 +221,7 @@ pub fn allocate_page4k() -> core::result::Result<Page4K, KError> {
         Err((err, ut, cs)) => {
             crust::capalloc::free_cap_slot(cs);
             free_untyped_4k(ut);
-            debug!(" --> failed due to become_page_4k");
+            // debug!(" --> failed due to become_page_4k");
             Err(err)
         }
     }

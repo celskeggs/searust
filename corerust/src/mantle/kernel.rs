@@ -153,19 +153,19 @@ pub const LOOKUP_FAILURE_MISSING_CAPABILITY: usize = 2;
 pub const LOOKUP_FAILURE_DEPTH_MISMATCH: usize = 3;
 pub const LOOKUP_FAILURE_GUARD_MISMATCH: usize = 4;
 
-pub const CAP_NULL: u32 = 0;
-pub const CAP_INIT_TCB: u32 = 1;
-pub const CAP_INIT_CNODE: u32 = 2;
-pub const CAP_INIT_VSPACE: u32 = 3;
-pub const CAP_INIT_IRQCONTROL: u32 = 4;
-pub const CAP_INIT_ASIDCONTROL: u32 = 5;
-pub const CAP_INIT_ASIDPOOL: u32 = 6; // for initial thread
-pub const CAP_INIT_IOPORT: u32 = 7;
-pub const CAP_INIT_IOSPACE: u32 = 8;
-pub const CAP_INIT_BOOTINFO_FRAME: u32 = 9;
-pub const CAP_INIT_IPCBUFFER: u32 = 10;
-pub const CAP_INIT_DOMAIN: u32 = 11;
-pub const CAP_INIT_COUNT: u32 = 12;
+pub const CAP_NULL: usize = 0;
+pub const CAP_INIT_TCB: usize = 1;
+pub const CAP_INIT_CNODE: usize = 2;
+pub const CAP_INIT_VSPACE: usize = 3;
+pub const CAP_INIT_IRQCONTROL: usize = 4;
+pub const CAP_INIT_ASIDCONTROL: usize = 5;
+pub const CAP_INIT_ASIDPOOL: usize = 6; // for initial thread
+pub const CAP_INIT_IOPORT: usize = 7;
+pub const CAP_INIT_IOSPACE: usize = 8;
+pub const CAP_INIT_BOOTINFO_FRAME: usize = 9;
+pub const CAP_INIT_IPCBUFFER: usize = 10;
+pub const CAP_INIT_DOMAIN: usize = 11;
+pub const CAP_INIT_COUNT: usize = 12;
 
 pub type MessageTag = u32;
 
