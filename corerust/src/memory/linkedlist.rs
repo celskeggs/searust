@@ -12,6 +12,20 @@ pub enum LinkedList<T> {
     List(Pair<T>)
 }
 
+fn start_cons<T>(head: T) -> core::result::Result<Pair<T>, T> {
+    match alloc::alloc_type::<LinkedList<T>>(LinkedList::Empty) {
+        Ok(tailref) => Ok(Pair::<T> { head: head, tail: tailref }),
+        Err(tail) => Err(head)
+    }
+}
+
+fn end_cons<T>(pair: Pair<T>, tail: LinkedList<T>) -> Pair<T> {
+    unsafe {
+        *pair.tail = tail;
+    }
+    pair
+}
+
 fn cons<T>(head: T, tail: LinkedList<T>) -> core::result::Result<Pair<T>, (T, LinkedList<T>)> {
     match alloc::alloc_type::<LinkedList<T>>(tail) {
         Ok(tailref) => Ok(Pair::<T> { head: head, tail: tailref }),
@@ -111,14 +125,15 @@ impl<T> LinkedList<T> {
     }
 
     pub fn pushmut<'a>(&mut self, x: T) -> core::result::Result<(), T> {
-        let removed_self = core::mem::replace(self, LinkedList::Empty);
-        match cons(x, removed_self) {
+        // this does special cons stuff because it's used during memory-allocation-sensitive steps
+        match start_cons(x) {
             Ok(pair) => {
-                *self = LinkedList::List(pair);
+                let removed_self = core::mem::replace(self, LinkedList::Empty);
+                let pair2 = end_cons(pair, removed_self);
+                *self = LinkedList::List(pair2);
                 Ok(())
             }
-            Err((x, removed_self)) => {
-                *self = removed_self;
+            Err(x) => {
                 Err(x)
             }
         }

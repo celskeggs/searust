@@ -27,7 +27,9 @@ impl<T> Box<T> {
             }
         }
     }
+}
 
+impl<T> Box<T> {
     pub unsafe fn from_raw(raw: *mut T) -> Box<T> {
         Box { ptr: raw }
     }

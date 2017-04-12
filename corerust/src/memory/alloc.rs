@@ -57,6 +57,7 @@ mod dynamic_alloc {
 
         fn add_fresh_page(&mut self) -> core::result::Result<(), KError> {
             if self.next_unalloc + kernel::PAGE_4K_SIZE > self.vregion.len() {
+                debug!("ran out of vregion to allocate");
                 Err(KError::NotEnoughMemory)
             } else {
                 let page = untyped::allocate_page4k()?;
@@ -69,6 +70,7 @@ mod dynamic_alloc {
                         Ok(())
                     },
                     Err((page, err)) => {
+                        debug!("failed to map address");
                         untyped::free_page4k(page);
                         Err(err)
                     }
@@ -93,6 +95,7 @@ mod dynamic_alloc {
                         if self.next_unalloc >= min_unalloc { // well... good enough for now?
                             return Ok(());
                         } else {
+                            debug!("failed to get fresh page");
                             return Err(err);
                         }
                     }

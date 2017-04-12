@@ -93,6 +93,7 @@ impl UntypedAllocator {
     pub fn add_small_page(&mut self, ut: Untyped) {
         assert!(ut.size_bits() == kernel::PAGE_4K_BITS);
         assert!(self.small_pages.pushmut(ut).is_ok());
+        debug!("adding small page => {}", self.small_pages.len());
     }
 
     pub fn add_initial_block(&mut self, ut: Untyped) {
@@ -115,6 +116,7 @@ impl UntypedAllocator {
 
     pub fn allocate_small_page(&mut self) -> core::result::Result<Untyped, KError> {
         if self.small_pages.is_empty() {
+            debug!("we're out of small pages: {}", self.small_pages.len());
             // TODO: make this actually work in low-memory conditions, because currently it won't be able to provide enough small pages without needing memory itself
 
             // let's take a large page, cut it up a bit (so that we can treat it as midsize pages) and add it to the pile
@@ -139,6 +141,7 @@ impl UntypedAllocator {
             assert!(!untypeds.remaining());
             assert!(self.stashed.pushmut(untypeds).is_ok());
         }
+        debug!("getting small page...");
         Ok(self.small_pages.popmut().unwrap())
     }
 
@@ -197,11 +200,19 @@ pub fn allocate_untyped_4k() -> core::result::Result<Untyped, KError> {
 }
 
 pub fn allocate_page4k() -> core::result::Result<Page4K, KError> {
-    let slot = crust::capalloc::allocate_cap_slot()?;
+    debug!("tried to allocate page4k");
+    let slot = match crust::capalloc::allocate_cap_slot() {
+        Ok(ut) => ut,
+        Err(err) => {
+            debug!(" --> failed due to allocate_cap_slot");
+            return Err(err);
+        }
+    };
     let ut = match allocate_untyped_4k() {
         Ok(ut) => ut,
         Err(err) => {
             crust::capalloc::free_cap_slot(slot);
+            debug!(" --> failed due to allocate_untyped_4k");
             return Err(err);
         }
     };
@@ -210,6 +221,7 @@ pub fn allocate_page4k() -> core::result::Result<Page4K, KError> {
         Err((err, ut, cs)) => {
             crust::capalloc::free_cap_slot(cs);
             free_untyped_4k(ut);
+            debug!(" --> failed due to become_page_4k");
             Err(err)
         }
     }

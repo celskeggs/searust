@@ -21,12 +21,16 @@ fn map_page_table(vaddr: usize) -> KError {
     // TODO: make this not break abstraction layers to work properly
     let cslot = match crust::capalloc::allocate_cap_slot() {
         Ok(p) => p,
-        Err(err) => return err
+        Err(err) => {
+            debug!("could not map page table");
+            return err
+        }
     };
     let ut = match untyped::allocate_untyped_4k() {
         Ok(p) => p,
         Err(err) => {
             crust::capalloc::free_cap_slot(cslot);
+            debug!("could not allocate untyped");
             return err;
         }
     };
@@ -35,6 +39,7 @@ fn map_page_table(vaddr: usize) -> KError {
         Err((err, ut, cslot)) => {
             untyped::free_untyped_4k(ut);
             crust::capalloc::free_cap_slot(cslot);
+            debug!("could not become page");
             return err;
         }
     };
@@ -46,6 +51,7 @@ fn map_page_table(vaddr: usize) -> KError {
             let (ut, cslot) = pt.free();
             untyped::free_untyped_4k(ut);
             crust::capalloc::free_cap_slot(cslot);
+            debug!("could not map into address");
             err
         }
     }

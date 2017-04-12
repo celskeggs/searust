@@ -5,11 +5,12 @@ use mantle::kernel::BootInfo;
 use ::crust;
 use ::core;
 use ::kobject::*;
+use core::fmt::Write;
 
 #[no_mangle]
 pub extern fn mantle_main(bootinfo: &BootInfo, executable_start: usize) {
     set_bootinfo(bootinfo, executable_start);
-    ::main(bootinfo);
+    //::main(bootinfo);
 }
 
 pub fn print_bootinfo(writer: &mut core::fmt::Write, bi: &BootInfo) -> core::fmt::Result {
@@ -33,7 +34,16 @@ fn set_bootinfo(bi: &BootInfo, executable_start: usize) {
     print_bootinfo(mantle::debug(), bi).unwrap();
     crust::capalloc::init_cslots(CapRange::range(bi.empty.start as usize, bi.empty.end as usize));
     crust::vspace::init_vspace(executable_start, image_len);
-    memory::init_allocator();
-    memory::untyped::init_untyped(CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untyped_list);
     memory::device::init_untyped(CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untyped_list);
+    match ::drivers::vga::VGAOutput::default() {
+        Ok(mut screen) => {
+            writeln!(screen, "Hello, world!").unwrap();
+            mantle::debug::set_mirror(screen);
+            crust::start::print_bootinfo(mantle::debug(), bi).unwrap();
+            memory::init_allocator();
+            memory::untyped::init_untyped(CapRange::range(bi.untyped.start as usize, bi.untyped.end as usize), bi.untyped_list);
+            memory::untyped::get_allocator().print_info(mantle::debug()).unwrap();
+        }
+        Err(err) => panic!("could not set up default VGA output: {:?}", err)
+    }
 }

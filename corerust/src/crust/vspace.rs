@@ -99,7 +99,7 @@ fn get_avail_regions_list() -> RefMut<'static, memory::LinkedList<VRegion>> {
 pub fn init_vspace(executable_start: usize, image_len: usize) {
     let region = &mut *get_avail_regions_list();
     region.pushmut(VRegion::new(executable_start + image_len + PAGE_4K_SIZE * 8, KERNEL_BASE_VADDR));
-    region.pushmut(VRegion::new(PAGE_2M_SIZE, executable_start));
+    //region.pushmut(VRegion::new(PAGE_2M_SIZE, executable_start));
     debug!("self was loaded to: {:#X}-{:#X}", executable_start, executable_start + image_len);
 }
 

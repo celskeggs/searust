@@ -366,6 +366,7 @@ pub fn get_mapped_device_page(addr: usize) -> core::result::Result<RegionMappedP
             Ok(mapping)
         }
         Err((page, err)) => {
+            debug!("CANCELLING PAGE MAPPING");
             return_device_page(addr, page);
             Err(err)
         }
