@@ -14,6 +14,11 @@ pub fn request(first_port: u16, count: u16) -> IOPortSet {
     IOPortSet { first: first_port, count }
 }
 
+pub fn request_one(port: u16) -> IOPort {
+    // TODO: make exclusive!
+    IOPort { port }
+}
+
 impl IOPort {
     pub fn get(&self) -> u8 {
         let (kerr, out) = mantle::x86_ioport_in8(mantle::kernel::CAP_INIT_IOPORT, self.port);

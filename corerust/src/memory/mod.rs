@@ -5,6 +5,7 @@ mod malloc;
 pub mod string;
 pub mod device;
 pub mod untyped;
+pub mod smalluntyped;
 
 pub use self::alloc::init_allocator;
 pub use self::mbox::Box;

@@ -7,7 +7,7 @@ use memory::Box;
 
 struct DebugOutput;
 
-const DEBUG_ON: bool = false;
+const DEBUG_ON: bool = true;
 
 impl Write for DebugOutput {
     fn write_str(&mut self, s: &str) -> Result {

@@ -25,7 +25,7 @@ fn handle_err(outputs: (u32, usize, usize, usize, usize), quiet: bool) -> KError
                     _ =>
                         debugc!("\n    --> failed to lookup {} cap: unexplicated variant {}", source_dest, outputs.2)
                 }
-            },
+            }
             _ => debugc!("\n    --> unexplicated error {:?}", result)
         };
     }
@@ -71,18 +71,20 @@ unsafe fn call_6(service: usize, label: u32, caps: u8, mr0: usize, mr1: usize, m
 }
 
 pub fn untyped_retype(service: usize, objtype: usize, size_bits: usize, root: usize,
-                           node_index: usize, node_depth: usize, node_offset: usize, num_objects: usize) -> KError {
+                      node_index: usize, node_depth: usize, node_offset: usize, num_objects: usize) -> KError {
     debugnl!("performing untyped_retype(service={}, objtype={}, size_bits={}, root={}, node_index={}, node_depth={}, node_offset={}, num_objects={})",
         service, objtype, size_bits, root, node_index, node_depth, node_offset, num_objects);
     kio::set_cap(0, root);
-    unsafe { call_6(service, kernel::TAG_UNTYPED_RETYPE, 1,
-                    objtype, size_bits, node_index, node_depth, node_offset, num_objects) }
+    unsafe {
+        call_6(service, kernel::TAG_UNTYPED_RETYPE, 1,
+               objtype, size_bits, node_index, node_depth, node_offset, num_objects)
+    }
 }
 
 pub fn cnode_delete(service: usize, index: usize, depth: u8) -> KError {
     debugnl!("performing cnode_delete(service={}, index={}, depth={})",
         service, index, depth);
-    unsafe { call_2(service, kernel::TAG_CNODE_DELETE, 0, index, depth as usize )}
+    unsafe { call_2(service, kernel::TAG_CNODE_DELETE, 0, index, depth as usize) }
 }
 
 pub fn x86_page_map(service: usize, vroot: usize, vaddr: usize, rights: usize, vmattrs: usize) -> KError {
@@ -94,7 +96,7 @@ pub fn x86_page_map(service: usize, vroot: usize, vaddr: usize, rights: usize, v
 
 pub fn x86_page_unmap(service: usize) -> KError {
     debugnl!("performing x86_page_unmap(service={})", service);
-    unsafe { call_0(service, kernel::TAG_X86_PAGE_UNMAP, 0)}
+    unsafe { call_0(service, kernel::TAG_X86_PAGE_UNMAP, 0) }
 }
 
 pub fn x86_page_table_map(service: usize, vroot: usize, vaddr: usize, vmattrs: usize) -> KError {
@@ -106,7 +108,7 @@ pub fn x86_page_table_map(service: usize, vroot: usize, vaddr: usize, vmattrs: u
 
 pub fn x86_page_table_unmap(service: usize) -> KError {
     debugnl!("performing x86_page_table_unmap(service={})", service);
-    unsafe { call_0(service, kernel::TAG_X86_PAGETABLE_UNMAP, 0)}
+    unsafe { call_0(service, kernel::TAG_X86_PAGETABLE_UNMAP, 0) }
 }
 
 pub fn x86_ioport_in8(service: usize, port: u16) -> (KError, u8) {
@@ -118,4 +120,26 @@ pub fn x86_ioport_in8(service: usize, port: u16) -> (KError, u8) {
 pub fn x86_ioport_out8(service: usize, port: u16, data: u8) -> KError {
     //debugnl!("performing x86_ioport_out8(service={}, port={}, data={})", service, port, data);
     unsafe { call_2(service, kernel::TAG_X86_IOPORT_OUT8, 0, port as usize, data as usize) }
+}
+
+pub fn irqcontrol_get(service: usize, irq: u32, root: usize, index: usize, depth: usize) -> KError {
+    debugnl!("performing irqcontrol_get(service={}, irq={}, root={}, index={}, depth={})", service, irq, root, index, depth);
+    kio::set_cap(0, root);
+    unsafe { call_3(service, kernel::TAG_IRQ_ISSUE_IRQ_HANDLER, 1, irq as usize, index, depth & 0xFF) }
+}
+
+pub fn irqhandler_ack(service: usize) -> KError {
+    debugnl!("performing irqhandler_ack(service={})", service);
+    unsafe { call_0(service, kernel::TAG_IRQ_ACK_IRQ, 0) }
+}
+
+pub fn irqhandler_set_notification(service: usize, notification: usize) -> KError {
+    debugnl!("performing irqhandler_set_notification(service={}, notification={})", service, notification);
+    kio::set_cap(0, notification);
+    unsafe { call_0(service, kernel::TAG_IRQ_SET_IRQ_HANDLER, 1) }
+}
+
+pub fn irqhandler_clear(service: usize) -> KError {
+    debugnl!("performing irqhandler_clear(service={})", service);
+    unsafe { call_0(service, kernel::TAG_IRQ_CLEAR_IRQ_HANDLER, 0) }
 }

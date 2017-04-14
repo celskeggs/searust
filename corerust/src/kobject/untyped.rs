@@ -60,6 +60,17 @@ impl Untyped {
         }
     }
 
+    pub fn split_calloc(self, split_bits: u8) -> core::result::Result<UntypedSet, (KError, Untyped)> {
+        let slots = crust::capalloc::allocate_cap_slots(1 << split_bits)?;
+        match self.split(split_bits, slots) {
+            Ok(us) => Ok(us),
+            Err((err, ut, slots)) => {
+                crust::capalloc::free_cap_slots(slots);
+                Err((err, ut))
+            }
+        }
+    }
+
     pub fn become_page_4k(self, capslot: CapSlot) -> core::result::Result<Page4K, (KError, Untyped, CapSlot)> {
         assert!(self.size_bits == PAGE_4K_BITS);
         match self.retype_raw_one(ObjectType::X864K, 0, capslot) {

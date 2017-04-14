@@ -12,6 +12,7 @@ pub mod concurrency;
 
 pub use self::kernel::KError;
 pub use self::calls::*;
+pub use self::kio::{signal, wait, poll};
 
 pub fn debug() -> &'static mut ::core::fmt::Write {
     debug::out()
