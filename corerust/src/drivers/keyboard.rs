@@ -1,6 +1,7 @@
 use ::mantle::concurrency::SingleThreaded;
 use ::core::cell::RefCell;
 use ::core::cell::RefMut;
+use ::memory::Box;
 
 mod ps2 {
     use ::drivers::irq;
@@ -8,6 +9,7 @@ mod ps2 {
     use ::mantle::concurrency::SingleThreaded;
     use ::core::cell::RefCell;
     use ::core::cell::RefMut;
+    use ::memory::Box;
 
     pub struct PS2Controller {
         port_data: ioport::IOPort,
@@ -31,7 +33,7 @@ mod ps2 {
 
     impl PS2Controller {
         fn new() -> PS2Controller {
-            let mut ctrl = PS2Controller { port_data: ioport::request_one(0x60), port_command: ioport::request_one(0x64), works: (false, false) };
+            let mut ctrl = PS2Controller { port_data: ioport::request_one(0x60), port_command: ioport::request_one(0x64), works: (false, false), port_1_irq: None, port_2_irq: None };
             ctrl.initialize();
             ctrl
         }
@@ -167,27 +169,29 @@ mod ps2 {
             self.write(b)
         }
 
-        pub fn start_port_1(&mut self, cb: FnMut(u8)) {
+        pub fn start_port_1<F: Fn(u8) + 'static, S: 'static + Fn() -> &'static PS2Controller>(&mut self, cb: F, get_self: S) {
             assert!(self.works.0);
             assert!(self.port_1_irq.is_none());
             self.port_1_irq = Some(irq::request(1).unwrap());
-            let portref = &self.port_1_irq.unwrap();
-            portref.set_cb(|| {
-                portref.ack();
-                assert!(self.can_read());
-                cb(self.port_data.get());
+            let portref: &irq::IRQ<'static> = &self.port_1_irq.as_ref().unwrap();
+            portref.set_cb(move || {
+                let self_: &PS2Controller = get_self();
+                &self_.port_1_irq.as_ref().unwrap().ack();
+                assert!(self_.can_read());
+                cb(self_.port_data.get());
             });
         }
 
-        pub fn start_port_2(&mut self, cb: FnMut(u8)) {
+        pub fn start_port_2<F: Fn(u8) + 'static, S: 'static + Fn() -> &'static PS2Controller>(&mut self, cb: F, get_self: S) {
             assert!(self.works.1);
             assert!(self.port_2_irq.is_none());
             self.port_2_irq = Some(irq::request(12).unwrap());
-            let portref = &self.port_2_irq.unwrap();
-            portref.set_cb(|| {
-                portref.ack();
-                assert!(self.can_read());
-                cb(self.port_data.get());
+            let portref: &irq::IRQ<'static> = &self.port_2_irq.as_ref().unwrap();
+            portref.set_cb(move || {
+                let self_: &PS2Controller = get_self();
+                &self_.port_2_irq.as_ref().unwrap().ack();
+                assert!(self_.can_read());
+                cb(self_.port_data.get());
             });
         }
 
@@ -203,20 +207,20 @@ mod ps2 {
     static CONTROLLER: SingleThreaded<RefCell<Option<PS2Controller>>> = SingleThreaded(RefCell::new(None));
 
     pub fn get_and_init_controller() -> RefMut<'static, PS2Controller> {
-        let m = CONTROLLER.get().borrow_mut();
+        let mut m: RefMut<Option<PS2Controller>> = CONTROLLER.get().borrow_mut();
         if (*m).is_none() {
-            *m = Some(PS2Controller::new());
+            *(&mut *m) = Some(PS2Controller::new());
         }
-        RefMut::map(m, |b| b.unwrap())
+        RefMut::map(m, |b: &mut Option<PS2Controller>| b.as_mut().unwrap())
     }
 }
 
-#[derive(Eq, PartialEq)]
 struct PS2Handler {
     is_second: bool,
     state: PS2HandlerState
 }
 
+#[derive(Eq, PartialEq, Debug)]
 enum PS2HandlerState {
     PreReset,
     SentReset,
@@ -237,7 +241,7 @@ impl PS2Handler {
 
     fn change_state(&mut self, state: PS2HandlerState) {
         assert!(state != self.state);
-        debug!("PS/2 state change on port {}: {} -> {}", if self.is_second { 2 } else { 1 }, self.state, state);
+        debug!("PS/2 state change on port {}: {:?} -> {:?}", if self.is_second { 2 } else { 1 }, self.state, state);
         self.state = state;
     }
 
@@ -251,13 +255,13 @@ impl PS2Handler {
                 self.change_state(if byte == 0xAA { PS2HandlerState::SelfTestPassed } else { PS2HandlerState::FailedInit })
             }, PS2HandlerState::SelfTestPassed => {
                 if byte == 0xFA {
-                    self.write_change_state(ctrl, 0xF5, PS2HandlerState::SentDisableScan)
+                    self.write_and_state(ctrl, 0xF5, PS2HandlerState::SentDisableScan)
                 } else {
                     self.change_state(PS2HandlerState::FailedInit)
                 }
             }, PS2HandlerState::SentDisableScan => {
                 if byte == 0xFA {
-                    self.write_change_state(ctrl, 0xF2, PS2HandlerState::SentIdentify)
+                    self.write_and_state(ctrl, 0xF2, PS2HandlerState::SentIdentify)
                 } else {
                     self.change_state(PS2HandlerState::FailedInit)
                 }
@@ -269,7 +273,7 @@ impl PS2Handler {
                 }
             }, PS2HandlerState::PartialIdentify => {
                 if byte == 0x41 || byte == 0x83 || byte == 0xC1 {
-                    self.write_change_state(ctrl, 0xEE, PS2HandlerState::FoundKeyboard)
+                    self.write_and_state(ctrl, 0xEE, PS2HandlerState::FoundKeyboard)
                 } else {
                     self.change_state(PS2HandlerState::IgnoredDevice)
                 }
@@ -300,9 +304,13 @@ impl PS2Handler {
         self.change_state(state)
     }
 
-    fn init(&mut self) {
+    fn init<S: 'static + Fn() -> &'static mut PS2Handler>(&mut self, get_self: S) {
         let ctrl: &mut ps2::PS2Controller = &mut *ps2::get_and_init_controller();
-        ctrl.start_port_1(self.on_recv);
+        if self.is_second {
+            ctrl.start_port_2(move |b| get_self().on_recv(b), || &*ps2::get_and_init_controller());
+        } else {
+            ctrl.start_port_1(move |b| get_self().on_recv(b), || &*ps2::get_and_init_controller());
+        }
         self.write_and_state(ctrl, 0xFF, PS2HandlerState::SentReset);
     }
 }
@@ -322,11 +330,11 @@ pub fn init() {
     let works = ctrl.get_works();
     if works.0 {
         stateref.first = Some(PS2Handler::create(false));
-        stateref.first.init();
+        stateref.first.as_mut().unwrap().init(|| (&mut *STATE.get().borrow_mut()).first.as_mut().unwrap());
     }
     if works.1 {
         stateref.second = Some(PS2Handler::create(true));
-        stateref.second.init();
+        stateref.second.as_mut().unwrap().init(|| (&mut *STATE.get().borrow_mut()).second.as_mut().unwrap());
     }
     // TODO: use mainloop of some sort?
 }

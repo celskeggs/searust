@@ -15,7 +15,7 @@ impl FragmentAllocator {
         let large_ut = memory::untyped::allocate_untyped_4k()?;
         // we want to go from 12 bits to 4 bits: 8 bit difference
         match large_ut.split_calloc(8) {
-            Ok(untypedset) => {
+            Ok(mut untypedset) => {
                 while let Some(ent) = untypedset.take_front() {
                     assert!(ent.size_bits() == 4);
                     self.available_fragments.pushmut(ent);
@@ -58,9 +58,26 @@ pub fn free_untyped_16b(ut: Untyped) {
 
 pub fn allocate_notification() -> core::result::Result<Notification, KError> {
     let ut: Untyped = allocate_untyped_16b()?;
-    ut.become_notification()
+    match crust::capalloc::allocate_cap_slot() {
+        Ok(slot) => {
+            match ut.become_notification(slot) {
+                Ok(noti) => Ok(noti),
+                Err((err, ut, slot)) => {
+                    crust::capalloc::free_cap_slot(slot);
+                    free_untyped_16b(ut);
+                    Err(err)
+                }
+            }
+        },
+        Err(err) => {
+            free_untyped_16b(ut);
+            Err(err)
+        }
+    }
 }
 
 pub fn free_notification(not: Notification) {
-    free_untyped_16b(not.free())
+    let (ut, slot) = not.free();
+    crust::capalloc::free_cap_slot(slot);
+    free_untyped_16b(ut)
 }

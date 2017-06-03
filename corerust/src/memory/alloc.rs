@@ -184,7 +184,7 @@ mod recycle_alloc {
 }
 
 pub fn alloc_fix(size: u16) -> Option<*mut u64> {
-    assert!(size >= 1 && size <= 255 * 8);
+    assert!(size >= 1 && size <= MAX_ALLOC_LEN as u16);
     let blks = ((size + 7) / 8) as u8;
     recycle_alloc::alloc_fixblks(blks).or_else(|| fixed_alloc::alloc_fixblks(blks)).or_else(|| dynamic_alloc::alloc_fixblks(blks))
 }
@@ -204,6 +204,16 @@ pub fn alloc_type<T>(x: T) -> core::result::Result<*mut T, T> {
     }
 }
 
+pub fn alloc_aligned(size: usize, align: usize) -> *mut u8 {
+    assert!(align == 1 || align == 2 || align == 4 || align == 8);
+    assert!(size >= 1 && size <= MAX_ALLOC_LEN);
+    let m: *mut u64 = alloc_fix(size as u16).unwrap_or(::core::ptr::null_mut());
+    m as *mut u8
+}
+
+// as per heap::EMPTY (a non-null pointer for arbitrary allocations)
+pub const HEAP_EMPTY: *mut () = 0xCA as *mut ();
+
 pub unsafe fn dealloc_fix(ptr: *mut u64, size: u16) {
     assert!(size >= 1 && size <= 255 * 8);
     recycle_alloc::dealloc_fixblks(ptr, ((size + 7) / 8) as u8)
@@ -220,6 +230,13 @@ pub unsafe fn dealloc_type<T>(ptr: *mut T) -> T {
     }
     dealloc_fix(ptr as *mut u64, size as u16);
     out
+}
+
+pub unsafe fn dealloc_aligned(ptr: *mut u8, size: usize, align: usize) {
+    assert!(align == 1 || align == 2 || align == 4 || align == 8);
+    assert!(size >= 1 && size <= MAX_ALLOC_LEN);
+    assert!(!ptr.is_null());
+    dealloc_fix(ptr as *mut u64, size as u16)
 }
 
 pub fn init_allocator() {

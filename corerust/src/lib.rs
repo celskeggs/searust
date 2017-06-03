@@ -3,6 +3,22 @@
 #![feature(asm)]
 #![feature(const_fn)]
 #![feature(drop_types_in_const)]
+// just for Box reimpl
+#![feature(fundamental)]
+#![feature(box_syntax)]
+#![feature(generic_param_attrs)]
+#![feature(dropck_eyepatch)]
+#![feature(custom_attribute)]
+#![feature(unboxed_closures)]
+#![feature(fused)]
+#![feature(unsize)]
+#![feature(coerce_unsized)]
+#![feature(placement_new_protocol)]
+#![feature(unique)]
+#![feature(exact_size_is_empty)]
+#![feature(fn_traits)]
+#![feature(core_intrinsics)]
+
 #![no_std]
 
 #[macro_use]

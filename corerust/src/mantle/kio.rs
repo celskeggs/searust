@@ -56,7 +56,7 @@ pub fn get_mr(i: u32) -> usize {
 }
 
 #[cfg(target_arch = "x86_64")]
-unsafe fn x64_sys_send(syscall: isize, dest: u64, info: u64, mr0: u64, mr1: u64, mr2: u64, mr3: u64) {
+unsafe fn x64_sys_send(syscall: isize, dest: usize, info: u32, mr0: usize, mr1: usize, mr2: usize, mr3: usize) {
     asm!(
 		"movq %rsp, %rbx\nsyscall\nmovq %rbx, %rsp\n"
 		:: "{rdx}"(syscall),
@@ -72,7 +72,7 @@ unsafe fn x64_sys_send(syscall: isize, dest: u64, info: u64, mr0: u64, mr1: u64,
 }
 
 #[cfg(target_arch = "x86_64")]
-unsafe fn x64_sys_reply(syscall: isize, info: u64, mr0: u64, mr1: u64, mr2: u64, mr3: u64) {
+unsafe fn x64_sys_reply(syscall: isize, info: u32, mr0: usize, mr1: usize, mr2: usize, mr3: usize) {
     asm!(
 		"movq %rsp, %rbx\nsyscall\nmovq %rbx, %rsp\n"
 		:: "{rdx}"(syscall),
@@ -87,7 +87,7 @@ unsafe fn x64_sys_reply(syscall: isize, info: u64, mr0: u64, mr1: u64, mr2: u64,
 }
 
 #[cfg(target_arch = "x86_64")]
-unsafe fn x64_sys_send_null(syscall: isize, dest: u64, info: u64) {
+unsafe fn x64_sys_send_null(syscall: isize, dest: usize, info: u32) {
     asm!(
 		"movq %rsp, %rbx\nsyscall\nmovq %rbx, %rsp\n"
 		:: "{rdx}"(syscall),
@@ -99,7 +99,7 @@ unsafe fn x64_sys_send_null(syscall: isize, dest: u64, info: u64) {
 }
 
 #[cfg(target_arch = "x86_64")]
-unsafe fn x64_sys_recv(syscall: isize, src: u64) -> (u64, u64, u64, u64, u64, u64) {
+unsafe fn x64_sys_recv(syscall: isize, src: usize) -> (usize, u32, usize, usize, usize, usize) {
     let info_out;
     let dest_out;
     let mr0_out;
@@ -123,8 +123,8 @@ unsafe fn x64_sys_recv(syscall: isize, src: u64) -> (u64, u64, u64, u64, u64, u6
 }
 
 #[cfg(target_arch = "x86_64")]
-unsafe fn x64_sys_send_recv(syscall: isize, dest: u64, info: u64, mr0: u64, mr1: u64,
-                            mr2: u64, mr3: u64) -> (u64, u64, u64, u64, u64, u64) {
+unsafe fn x64_sys_send_recv(syscall: isize, dest: usize, info: u32, mr0: usize, mr1: usize,
+                            mr2: usize, mr3: usize) -> (usize, u32, usize, usize, usize, usize) {
     let info_out;
     let dest_out;
     let mr0_out;
@@ -166,7 +166,7 @@ unsafe fn x64_sys_null(syscall: isize) {
 
 pub fn debug_put_char(c: u8) {
     unsafe {
-        x64_sys_send_recv(kernel::SYS_DEBUG_PUTCHAR, c as u64, 0, 0, 0, 0, 0);
+        x64_sys_send_recv(kernel::SYS_DEBUG_PUTCHAR, c as usize, 0, 0, 0, 0, 0);
     }
 }
 
@@ -230,7 +230,7 @@ pub unsafe fn call(dest: usize, msginfo: kernel::MessageInfo) -> kernel::Message
     let mr3 = get_mr(3);
 
     let (_, info_out, mr0_out, mr1_out, mr2_out, mr3_out) =
-        x64_sys_send_recv(kernel::SYS_CALL, dest as u64, msginfo as u64, mr0 as u64, mr1 as u64, mr2 as u64, mr3 as u64);
+        x64_sys_send_recv(kernel::SYS_CALL, dest, msginfo, mr0, mr1, mr2, mr3);
 
     set_mr(0, mr0_out);
     set_mr(1, mr1_out);
@@ -243,9 +243,9 @@ pub unsafe fn call(dest: usize, msginfo: kernel::MessageInfo) -> kernel::Message
 pub unsafe fn call_with_mrs(dest: usize, msginfo: kernel::MessageInfo, mr0: usize, mr1: usize, mr2: usize, mr3: usize)
                             -> (kernel::MessageInfo, usize, usize, usize, usize) {
     let (_, info_out, mr0_out, mr1_out, mr2_out, mr3_out) =
-        x64_sys_send_recv(kernel::SYS_CALL, dest as u64, msginfo as u64, mr0 as u64, mr1 as u64, mr2 as u64, mr3 as u64);
+        x64_sys_send_recv(kernel::SYS_CALL, dest, msginfo, mr0, mr1, mr2, mr3);
 
-    (info_out as kernel::MessageInfo, mr0_out as usize, mr1_out as usize, mr2_out as usize, mr3_out as usize)
+    (info_out as kernel::MessageInfo, mr0_out, mr1_out, mr2_out, mr3_out)
 }
 
 pub unsafe fn reply_recv(dest: usize, info: kernel::MessageInfo) -> (kernel::MessageInfo, usize) {
@@ -254,7 +254,7 @@ pub unsafe fn reply_recv(dest: usize, info: kernel::MessageInfo) -> (kernel::Mes
     let mr2 = get_mr(2);
     let mr3 = get_mr(3);
 
-    let (_, info_out, mr0_out, mr1_out, mr2_out, mr3_out) =
+    let (dest_out, info_out, mr0_out, mr1_out, mr2_out, mr3_out) =
         x64_sys_send_recv(kernel::SYS_REPLY_RECV, dest, info, mr0, mr1, mr2, mr3);
 
     set_mr(0, mr0_out);
@@ -262,14 +262,14 @@ pub unsafe fn reply_recv(dest: usize, info: kernel::MessageInfo) -> (kernel::Mes
     set_mr(2, mr2_out);
     set_mr(3, mr3_out);
 
-    (info_out as kernel::MessageInfo, info_out)
+    (info_out as kernel::MessageInfo, dest_out)
 }
 
 pub unsafe fn reply_recv_with_mrs(dest: usize, info: kernel::MessageInfo, mr0: usize, mr1: usize, mr2: usize, mr3: usize) -> (kernel::MessageInfo, usize, usize, usize, usize, usize) {
-    let (_, info_out, mr0_out, mr1_out, mr2_out, mr3_out) =
+    let (dest_out, info_out, mr0_out, mr1_out, mr2_out, mr3_out) =
         x64_sys_send_recv(kernel::SYS_REPLY_RECV, dest, info, mr0, mr1, mr2, mr3);
 
-    (info_out as kernel::MessageInfo, info_out, mr0_out, mr1_out, mr2_out, mr3_out)
+    (info_out as kernel::MessageInfo, dest_out, mr0_out, mr1_out, mr2_out, mr3_out)
 }
 
 pub fn yield_() {
@@ -288,6 +288,6 @@ pub fn wait(src: usize) -> usize {
 
 pub fn poll(src: usize) -> usize {
     unsafe {
-        nbrecv(src)
+        nbrecv(src).1
     }
 }

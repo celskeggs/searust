@@ -3,7 +3,7 @@ use ::crust;
 use ::core;
 use ::mantle;
 use ::mantle::KError;
-use ::mantle::kernel::{PAGE_4K_SIZE, PAGE_4K_BITS};
+use ::mantle::kernel::{PAGE_4K_SIZE, PAGE_4K_BITS, SMALL_BITS};
 pub use ::mantle::kernel::ObjectType;
 
 #[derive(Debug)]
@@ -61,12 +61,17 @@ impl Untyped {
     }
 
     pub fn split_calloc(self, split_bits: u8) -> core::result::Result<UntypedSet, (KError, Untyped)> {
-        let slots = crust::capalloc::allocate_cap_slots(1 << split_bits)?;
-        match self.split(split_bits, slots) {
-            Ok(us) => Ok(us),
-            Err((err, ut, slots)) => {
-                crust::capalloc::free_cap_slots(slots);
-                Err((err, ut))
+        match crust::capalloc::allocate_cap_slots(1 << split_bits) {
+            Ok(slots) => {
+                match self.split(split_bits, slots) {
+                    Ok(us) => Ok(us),
+                    Err((err, ut, slots)) => {
+                        crust::capalloc::free_cap_slots(slots);
+                        Err((err, ut))
+                    }
+                }
+            }, Err(err) => {
+                Err((err, self))
             }
         }
     }
@@ -83,6 +88,14 @@ impl Untyped {
         assert!(self.size_bits == PAGE_4K_BITS);
         match self.retype_raw_one(ObjectType::X86PageTableObject, 0, capslot) {
             Ok(cap) => Ok(PageTable::from_retyping(cap, self)),
+            Err((err, capslot)) => Err((err, self, capslot))
+        }
+    }
+
+    pub fn become_notification(self, capslot: CapSlot) -> core::result::Result<Notification, (KError, Untyped, CapSlot)> {
+        assert!(self.size_bits == SMALL_BITS);
+        match self.retype_raw_one(ObjectType::NotificationObject, 0, capslot) {
+            Ok(cap) => Ok(Notification::from_retyping(cap, self)),
             Err((err, capslot)) => Err((err, self, capslot))
         }
     }

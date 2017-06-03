@@ -9,35 +9,38 @@ use ::core::cell::RefCell;
 use ::core::cell::RefMut;
 use ::memory::Box;
 
-pub const IRQ_MAX: u8 = 32;
+pub const IRQ_MAX: u32 = 32;
 
 struct IRQManager {
     irqcontrol: IRQControl,
     notification: Notification,
-    callbacks: [RefCell<Option<FnMut()>>; IRQ_MAX as usize]
+    callbacks: RefCell<[Option<Box<FnMut()>>; IRQ_MAX as usize]>
 }
 
 pub struct IRQ<'a> {
     irqhandler: IRQHandler,
     manager: &'a IRQManager,
-    irq: u8
+    irq: u32
 }
 
 impl IRQManager {
-    fn new() -> IRQManager {
+    fn new() -> core::result::Result<IRQManager, KError> {
+        let notify = memory::smalluntyped::allocate_notification()?;
         let irqc = IRQControl::from_cap(CapSlot::from_index(mantle::kernel::CAP_INIT_IRQCONTROL).assert_populated());
-        IRQManager { irqcontrol: irqc, notification: memory::smalluntyped::allocate_notification(), callbacks: [None; IRQ_MAX as usize] }
+        Ok(IRQManager { irqcontrol: irqc, notification: notify, callbacks: RefCell::new(
+            [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]) })
     }
 
-    fn request<'a>(&'a self, irq: u8) -> core::result::Result<IRQ<'a>, KError> {
+    fn request<'a>(&'a self, irq: u32) -> core::result::Result<IRQ<'a>, KError> {
         assert!(irq < IRQ_MAX); // make sure it fits in a notification word
         let cslot = crust::capalloc::allocate_cap_slot()?;
-        match self.irqc.get(irq, cslot) {
+        match self.irqcontrol.get(irq, cslot) {
             Ok(irqhandler) => {
-                irqhandler.set_notification(self.notification);
+                irqhandler.set_notification(&self.notification);
                 Ok(IRQ { irqhandler, manager: self, irq })
             }
-            Err((cslot, err)) => {
+            Err((err, cslot)) => {
                 crust::capalloc::free_cap_slot(cslot);
                 Err(err)
             }
@@ -45,7 +48,7 @@ impl IRQManager {
     }
 
     fn on_bit(&mut self, bit: u32) {
-        if let &Some(ref cb) = self.callbacks[bit].borrow() {
+        if let &Some(ref cb) = &self.callbacks.borrow()[bit as usize] {
             debug!("invoking IRQ callback for {}", bit);
             cb();
         } else {
@@ -66,33 +69,33 @@ impl IRQManager {
         }
     }
 
-    fn set_callback(&self, irq: u8, cb: FnMut()) {
-        assert!(self.callbacks[irq].is_none());
-        self.callbacks[irq] = Some(cb);
+    fn set_callback<F: Fn() + 'static>(&self, irq: u32, cb: F) {
+        assert!(self.callbacks.borrow()[irq as usize].is_none());
+        self.callbacks.borrow_mut()[irq as usize] = Some(Box::new(cb));
     }
 
-    fn clear_callback(&self, irq: u8) {
-        assert!(self.callbacks[irq].is_some());
-        self.callbacks[irq] = None;
+    fn clear_callback(&self, irq: u32) {
+        assert!(self.callbacks.borrow()[irq as usize].is_some());
+        self.callbacks.borrow_mut()[irq as usize] = None;
     }
 }
 
 impl<'a> IRQ<'a> {
-    fn free(self) {
+    pub fn free(self) {
         self.clear_cb();
         assert!(self.irqhandler.clear().is_ok());
         crust::capalloc::free_cap_slot(self.irqhandler.free())
     }
 
-    fn ack(&self) -> KError {
+    pub fn ack(&self) -> core::result::Result<(), KError> {
         self.irqhandler.ack()
     }
 
-    fn set_cb(&self, cb: FnMut()) {
+    pub fn set_cb<F: Fn() + 'static>(&self, cb: F) {
         self.manager.set_callback(self.irq, cb)
     }
 
-    fn clear_cb(&self) {
+    pub fn clear_cb(&self) {
         self.manager.clear_callback(self.irq);
     }
 }
@@ -102,9 +105,9 @@ static MANAGER: SingleThreaded<RefCell<Option<IRQManager>>> = SingleThreaded(Ref
 fn get_manager() -> RefMut<'static, IRQManager> {
     let m = MANAGER.get().borrow_mut();
     if (*m).is_none() {
-        *m = Some(IRQManager::new());
+        *m = Some(IRQManager::new().unwrap());
     }
-    RefMut::map(m, |b| b.unwrap())
+    RefMut::map(m, |b| &mut b.unwrap())
 }
 
 pub fn mainloop() {
@@ -112,7 +115,7 @@ pub fn mainloop() {
     m.mainloop();
 }
 
-pub fn request(irq: u8) -> core::result::Result<IRQ<'static>, KError> {
+pub fn request(irq: u32) -> core::result::Result<IRQ<'static>, KError> {
     let m = &mut *get_manager();
     m.request(irq)
 }
